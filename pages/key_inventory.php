@@ -3,29 +3,6 @@ declare(strict_types=1);
 
 $isPartialRequest = isset($_GET['partial']) && (string)$_GET['partial'] === '1';
 
-if (!isset($pdo) || !$pdo instanceof PDO) {
-    $config = require __DIR__ . '/../config/config.php';
-
-    require __DIR__ . '/../inc/helpers.php';
-    require __DIR__ . '/../inc/db.php';
-    require __DIR__ . '/../inc/auth.php';
-    require __DIR__ . '/../inc/access.php';
-
-    start_session($config);
-
-    if (!is_logged_in()) {
-        http_response_code(401);
-        exit;
-    }
-
-    $pdo = db($config);
-
-    if (!can_access_page($pdo, 'key_inventory')) {
-        http_response_code(403);
-        exit;
-    }
-}
-
 function key_inventory_fetch_data(PDO $pdo): array
 {
     $stmt = $pdo->query("
@@ -242,8 +219,7 @@ if ($isPartialRequest) {
     exit;
 }
 
-$baseUrl = rtrim((string)($config['app']['base_url'] ?? ''), '/');
-$partialUrl = ($baseUrl !== '' ? $baseUrl : '.') . '/pages/key_inventory.php?partial=1';
+$partialUrl = 'index.php?page=key_inventory&partial=1';
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
