@@ -1,0 +1,43 @@
+.keys-table {
+    table-layout: auto;
+}
+
+.keys-table th,
+.keys-table td {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+}
+
+.keys-rfid-input {
+    min-width: 140px;
+}
+
+.keys-floating-add {
+    position: fixed;
+    right: 2rem;
+    bottom: 2rem;
+    z-index: 1050;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.25rem;
+    line-height: 1;
+    font-weight: 400;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+    padding: 0;
+}
+
+@media (max-width: 575.98px) {
+    .keys-floating-add {
+        right: 1rem;
+        bottom: 1rem;
+        width: 3.5rem;
+        height: 3.5rem;
+        font-size: 2rem;
+    }
+}
