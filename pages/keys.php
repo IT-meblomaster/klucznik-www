@@ -403,7 +403,13 @@ $showModal = $editKey !== null;
     </div>
 </div>
 
-<div class="modal fade <?= $showModal ? 'show' : '' ?>" id="keyModal" tabindex="-1" aria-hidden="<?= $showModal ? 'false' : 'true' ?>" <?= $showModal ? 'style="display: block;"' : '' ?>>
+<div
+    class="modal fade"
+    id="keyModal"
+    tabindex="-1"
+    aria-hidden="true"
+    data-show-on-load="<?= $showModal ? '1' : '0' ?>"
+>
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" autocomplete="off">
@@ -452,20 +458,3 @@ $showModal = $editKey !== null;
         </div>
     </div>
 </div>
-
-<?php if ($showModal): ?>
-    <div class="modal-backdrop fade show"></div>
-<?php endif; ?>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.js-rfid-no-enter').forEach((input) => {
-        input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-        });
-    });
-});
-</script>

@@ -120,6 +120,9 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
     <?php if ($currentPage === 'key_inventory'): ?>
         <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/key-inventory.css') ?>" rel="stylesheet">
     <?php endif; ?>
+    <?php if ($currentPage === 'keys'): ?>
+        <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/keys.css') ?>" rel="stylesheet">
+    <?php endif; ?>
 </head>
 <body>
 <div class="page">

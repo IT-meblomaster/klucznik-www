@@ -13,5 +13,8 @@
 <?php if (current_page() === 'key_inventory'): ?>
     <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/key-inventory.js') ?>"></script>
 <?php endif; ?>
+<?php if (current_page() === 'keys'): ?>
+    <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/keys.js') ?>"></script>
+<?php endif; ?>
 </body>
 </html>
