@@ -117,6 +117,9 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
     <title><?= e($config['app']['name'] ?? 'Template') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/style.css') ?>" rel="stylesheet">
+    <?php if ($currentPage === 'key_inventory'): ?>
+        <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/key-inventory.css') ?>" rel="stylesheet">
+    <?php endif; ?>
 </head>
 <body>
 <div class="page">

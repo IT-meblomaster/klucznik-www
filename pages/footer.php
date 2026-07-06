@@ -10,8 +10,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/menu.js') ?>"></script>
 <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/app.js') ?>"></script>
-<?php if (current_page() === 'rcp'): ?>
-    <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/rcp-comments.js') ?>"></script>
+<?php if (current_page() === 'key_inventory'): ?>
+    <script src="<?= e(($config['app']['base_url'] ?? '') . '/assets/js/key-inventory.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>
