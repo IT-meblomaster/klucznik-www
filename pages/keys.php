@@ -439,7 +439,7 @@ $showModal = $editKey !== null;
 
                     <div class="mb-0">
                         <label class="form-label">RFID</label>
-                        <input type="text" name="rfid_code" class="form-control" value="<?= e($modalRfidCode) ?>">
+                        <input type="text" name="rfid_code" class="form-control js-rfid-no-enter" value="<?= e($modalRfidCode) ?>">
                         <div class="form-text">Wyczyść pole i zapisz, żeby usunąć przypisanie RFID.</div>
                     </div>
                 </div>
@@ -456,3 +456,16 @@ $showModal = $editKey !== null;
 <?php if ($showModal): ?>
     <div class="modal-backdrop fade show"></div>
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.js-rfid-no-enter').forEach((input) => {
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+    });
+});
+</script>
