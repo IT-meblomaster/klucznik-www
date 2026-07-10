@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 if (is_logged_in()) {
-    redirect('index.php?page=dashboard');
+    redirect('index.php?page=key_inventory');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (login($pdo, $username, $password)) {
         regenerate_csrf_token();
         set_flash('success', 'Zalogowano poprawnie.');
-        redirect('index.php?page=dashboard');
+        redirect('index.php?page=key_inventory');
     }
 
     set_flash('danger', 'Nieprawidłowy login lub hasło.');
