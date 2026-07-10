@@ -1,3 +1,8 @@
+html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+}
+
 .keys-table {
     table-layout: auto;
 }
@@ -10,8 +15,90 @@
     vertical-align: middle;
 }
 
-.keys-rfid-input {
-    min-width: 140px;
+.keys-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.keys-search-group {
+    flex: 1 1 auto;
+    min-width: 18rem;
+    margin: 0;
+}
+
+.keys-filter-area {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.keys-filter-box {
+    min-width: 12rem;
+    margin: 0;
+    padding: 0.45rem 0.8rem 0.6rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+.keys-filter-box legend {
+    float: none;
+    width: auto;
+    margin: 0;
+    padding: 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--bs-secondary-color);
+}
+
+.keys-filter-box .form-check {
+    min-height: auto;
+    margin: 0 0 0.25rem;
+}
+
+.keys-filter-box .form-check:last-child {
+    margin-bottom: 0;
+}
+
+.keys-filter-box .form-check-label {
+    white-space: nowrap;
+}
+
+#keysShowAll {
+    align-self: center;
+    margin: 0;
+}
+
+.keys-sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+}
+
+.keys-sort-button:hover,
+.keys-sort-button:focus {
+    text-decoration: underline;
+}
+
+.keys-sort-button.is-active {
+    font-weight: 700;
+}
+
+.keys-sort-indicator {
+    display: inline-block;
+    min-width: 0.75rem;
+    font-size: 0.7rem;
 }
 
 .keys-floating-add {
@@ -61,7 +148,37 @@
     vertical-align: middle;
 }
 
+@media (max-width: 991.98px) {
+    .keys-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .keys-search-group {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .keys-filter-area {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
 @media (max-width: 575.98px) {
+    .keys-filter-area {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .keys-filter-box {
+        width: 100%;
+    }
+
+    #keysShowAll {
+        align-self: flex-end;
+    }
+
     .keys-floating-add {
         right: 1rem;
         bottom: 1rem;
