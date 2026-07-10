@@ -74,12 +74,12 @@ if (!is_file($pageFile)) {
     exit('Brak pliku strony: ' . e((string)$pageRecord['file_path']));
 }
 
-/*
- * Strony typu endpoint (np. zwracające obraz, plik, JSON)
- * nie powinny renderować layoutu aplikacji.
- */
+$isPartialRequest = isset($_GET['partial']) && (string)$_GET['partial'] === '1';
 
-if (in_array((string)$pageRecord['slug'], ['photo', 'monitor_data', 'kolowroty_data', 'rcp_export', 'rcp_comments'], true)) {
+if (
+    $isPartialRequest
+    || in_array((string)$pageRecord['slug'], ['photo', 'monitor_data', 'kolowroty_data', 'rcp_export', 'rcp_comments'], true)
+) {
     require $pageFile;
     ob_end_flush();
     exit;

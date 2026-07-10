@@ -49,6 +49,18 @@
     height: 1.45rem;
 }
 
+.buildings-table {
+    table-layout: auto;
+}
+
+.buildings-table th,
+.buildings-table td {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+}
+
 @media (max-width: 575.98px) {
     .keys-floating-add {
         right: 1rem;

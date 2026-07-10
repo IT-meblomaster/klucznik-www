@@ -9,14 +9,16 @@ function key_inventory_fetch_data(PDO $pdo): array
         SELECT
             k.id,
             k.name,
-            k.budynek,
             k.zawieszka,
             k.description,
+            b.name AS building,
             r.rfid_code,
             CASE WHEN kl.id IS NOT NULL THEN 1 ELSE 0 END AS is_issued,
             kl.issued_to_name,
             kl.issued_at
         FROM `keys` k
+        INNER JOIN buildings b
+            ON b.id = k.building_id
         LEFT JOIN key_rfid_assignments a
             ON a.key_id = k.id
            AND a.assigned_to IS NULL
@@ -26,7 +28,7 @@ function key_inventory_fetch_data(PDO $pdo): array
             ON kl.key_id = k.id
            AND kl.returned_at IS NULL
         WHERE k.is_active = 1
-        ORDER BY k.budynek, k.name
+        ORDER BY b.name, k.name
     ");
 
     $keys = $stmt->fetchAll();
@@ -38,7 +40,7 @@ function key_inventory_fetch_data(PDO $pdo): array
     $withoutRfid = 0;
 
     foreach ($keys as $key) {
-        $building = trim((string)($key['budynek'] ?? ''));
+        $building = trim((string)($key['building'] ?? ''));
         $building = $building !== '' ? $building : 'Bez budynku';
 
         $isIssued = (int)($key['is_issued'] ?? 0) === 1;
@@ -77,7 +79,7 @@ function key_inventory_tooltip(array $key): string
     $lines = [];
 
     $name = trim((string)($key['name'] ?? ''));
-    $building = trim((string)($key['budynek'] ?? ''));
+    $building = trim((string)($key['building'] ?? ''));
     $description = trim((string)($key['description'] ?? ''));
     $hanger = trim((string)($key['zawieszka'] ?? ''));
     $rfid = trim((string)($key['rfid_code'] ?? ''));
@@ -228,15 +230,11 @@ $partialUrl = 'index.php?page=key_inventory&partial=1';
         <div class="text-muted">Inwentaryzacja według budynków</div>
     </div>
 
-    <div class="text-end text-muted key-inventory-refresh-status">
-        Automatyczne odświeżanie co 5 sekund<br>
-        <span id="key-inventory-refresh-state">Gotowe</span>
+    <div class="text-muted key-inventory-refresh-status" id="key-inventory-refresh-state">
+        Odświeżanie automatyczne
     </div>
 </div>
 
-<div
-    id="key-inventory-content"
-    data-refresh-url="<?= e($partialUrl) ?>"
->
+<div id="key-inventory-content" data-refresh-url="<?= e($partialUrl) ?>">
     <?php key_inventory_render_content($data); ?>
 </div>

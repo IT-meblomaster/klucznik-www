@@ -41,8 +41,8 @@ if ($keyFilter !== '') {
 }
 
 if ($buildingFilter !== '') {
-    $whereIssue[] = 'COALESCE(k.budynek, \'\') = :building_issue';
-    $whereReturn[] = 'COALESCE(k.budynek, \'\') = :building_return';
+    $whereIssue[] = 'b.name = :building_issue';
+    $whereReturn[] = 'b.name = :building_return';
     $params[':building_issue'] = $buildingFilter;
     $params[':building_return'] = $buildingFilter;
 }
@@ -57,13 +57,15 @@ $sql = "
             kl.issued_at AS event_time,
             'Wydanie' AS event_type,
             k.name AS key_name,
-            k.budynek AS building,
+            b.name AS building,
             kl.issued_to_name AS user_name,
             kl.issued_to_card AS user_card,
             r.rfid_code AS rfid_code
         FROM key_loans kl
         INNER JOIN `keys` k
             ON k.id = kl.key_id
+        INNER JOIN buildings b
+            ON b.id = k.building_id
         LEFT JOIN rfid_tags r
             ON r.id = kl.rfid_tag_id
         WHERE kl.issued_at IS NOT NULL
@@ -75,13 +77,15 @@ $sql = "
             kl.returned_at AS event_time,
             'Zwrot' AS event_type,
             k.name AS key_name,
-            k.budynek AS building,
+            b.name AS building,
             kl.returned_by_name AS user_name,
             kl.returned_by_card AS user_card,
             r.rfid_code AS rfid_code
         FROM key_loans kl
         INNER JOIN `keys` k
             ON k.id = kl.key_id
+        INNER JOIN buildings b
+            ON b.id = k.building_id
         LEFT JOIN rfid_tags r
             ON r.id = kl.rfid_tag_id
         WHERE kl.returned_at IS NOT NULL
@@ -113,10 +117,10 @@ $keys = $pdo->query("
 ")->fetchAll();
 
 $buildings = $pdo->query("
-    SELECT DISTINCT COALESCE(budynek, '') AS building
-    FROM `keys`
+    SELECT name
+    FROM buildings
     WHERE is_active = 1
-    ORDER BY building
+    ORDER BY name
 ")->fetchAll();
 ?>
 
@@ -174,9 +178,9 @@ $buildings = $pdo->query("
                 <select name="building" class="form-select">
                     <option value="">Wszystkie</option>
                     <?php foreach ($buildings as $building): ?>
-                        <?php $value = (string)$building['building']; ?>
+                        <?php $value = (string)$building['name']; ?>
                         <option value="<?= e($value) ?>" <?= $value === $buildingFilter ? 'selected' : '' ?>>
-                            <?= $value !== '' ? e($value) : 'Bez budynku' ?>
+                            <?= e($value) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

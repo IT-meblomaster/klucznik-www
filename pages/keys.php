@@ -7,6 +7,11 @@ function keys_null_if_empty(?string $value): ?string
     return $value === '' ? null : $value;
 }
 
+function keys_required_text(?string $value): string
+{
+    return trim((string)$value);
+}
+
 function keys_insert_log(PDO $pdo, int $keyId, ?int $rfidTagId, string $actionType, ?string $details): void
 {
     $stmt = $pdo->prepare("
@@ -161,14 +166,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'save_key') {
             $id = (int)($_POST['id'] ?? 0);
-            $name = trim((string)($_POST['name'] ?? ''));
-            $building = keys_null_if_empty($_POST['building'] ?? null);
-            $hanger = keys_null_if_empty($_POST['hanger'] ?? null);
+            $name = keys_required_text($_POST['name'] ?? '');
+            $buildingId = (int)($_POST['building_id'] ?? 0);
+            $hanger = keys_required_text($_POST['hanger'] ?? '');
             $description = keys_null_if_empty($_POST['description'] ?? null);
             $rfidCode = keys_null_if_empty($_POST['rfid_code'] ?? null);
 
             if ($name === '') {
                 throw new RuntimeException('Podaj nazwę klucza.');
+            }
+
+            if ($buildingId <= 0) {
+                throw new RuntimeException('Wybierz budynek.');
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT id
+                FROM buildings
+                WHERE id = :id
+                  AND is_active = 1
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $buildingId]);
+
+            if (!$stmt->fetchColumn()) {
+                throw new RuntimeException('Wybrany budynek nie istnieje albo jest nieaktywny.');
             }
 
             $pdo->beginTransaction();
@@ -177,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("
                     UPDATE `keys`
                     SET name = :name,
-                        budynek = :building,
+                        building_id = :building_id,
                         zawieszka = :hanger,
                         description = :description
                     WHERE id = :id
@@ -185,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([
                     ':id' => $id,
                     ':name' => $name,
-                    ':building' => $building,
+                    ':building_id' => $buildingId,
                     ':hanger' => $hanger,
                     ':description' => $description,
                 ]);
@@ -196,12 +218,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 set_flash('success', 'Zaktualizowano klucz.');
             } else {
                 $stmt = $pdo->prepare("
-                    INSERT INTO `keys` (name, budynek, zawieszka, description, is_active)
-                    VALUES (:name, :building, :hanger, :description, 1)
+                    INSERT INTO `keys` (name, building_id, zawieszka, description, is_active)
+                    VALUES (:name, :building_id, :hanger, :description, 1)
                 ");
                 $stmt->execute([
                     ':name' => $name,
-                    ':building' => $building,
+                    ':building_id' => $buildingId,
                     ':hanger' => $hanger,
                     ':description' => $description,
                 ]);
@@ -227,9 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
 
-            $stmt = $pdo->prepare("SELECT name FROM `keys` WHERE id = :id LIMIT 1 FOR UPDATE");
-            $stmt->execute([':id' => $id]);
-            $keyName = (string)($stmt->fetchColumn() ?: ('ID ' . $id));
+            $keyName = keys_get_key_name($pdo, $id);
 
             $stmt = $pdo->prepare("
                 SELECT id, rfid_tag_id
@@ -279,11 +299,14 @@ if ($editId > 0) {
         SELECT
             k.id,
             k.name,
-            k.budynek,
+            k.building_id,
+            b.name AS building_name,
             k.zawieszka,
             k.description,
             r.rfid_code
         FROM `keys` k
+        INNER JOIN buildings b
+            ON b.id = k.building_id
         LEFT JOIN key_rfid_assignments a
             ON a.key_id = k.id
            AND a.assigned_to IS NULL
@@ -295,48 +318,69 @@ if ($editId > 0) {
     ");
     $stmt->execute([':id' => $editId]);
     $editKey = $stmt->fetch() ?: null;
+
+    if (!$editKey) {
+        set_flash('danger', 'Nie znaleziono klucza.');
+        redirect('index.php?page=keys');
+    }
 }
+
+$showModal = isset($_GET['new']) || $editKey !== null;
+
+$buildings = $pdo->query("
+    SELECT id, name
+    FROM buildings
+    WHERE is_active = 1
+    ORDER BY name
+")->fetchAll();
 
 $stmt = $pdo->query("
     SELECT
         k.id,
         k.name,
-        k.budynek,
+        k.building_id,
+        b.name AS building_name,
         k.zawieszka,
         k.description,
         r.rfid_code,
-        CASE WHEN r.rfid_code IS NULL OR r.rfid_code = '' THEN 'Brak RFID' ELSE 'Przypisany' END AS rfid_status
+        CASE WHEN kl.id IS NOT NULL THEN 1 ELSE 0 END AS is_issued,
+        kl.issued_to_name,
+        kl.issued_at
     FROM `keys` k
+    INNER JOIN buildings b
+        ON b.id = k.building_id
     LEFT JOIN key_rfid_assignments a
         ON a.key_id = k.id
        AND a.assigned_to IS NULL
     LEFT JOIN rfid_tags r
         ON r.id = a.rfid_tag_id
+    LEFT JOIN key_loans kl
+        ON kl.key_id = k.id
+       AND kl.returned_at IS NULL
     WHERE k.is_active = 1
-    ORDER BY k.budynek, k.name
+    ORDER BY b.name, k.name
 ");
 $keys = $stmt->fetchAll();
 
-$modalTitle = $editKey ? 'Edytuj klucz' : 'Dodaj klucz';
-$modalSubmit = $editKey ? 'Zapisz zmiany' : 'Dodaj';
-$modalKeyId = (int)($editKey['id'] ?? 0);
-$modalName = (string)($editKey['name'] ?? '');
-$modalBuilding = (string)($editKey['budynek'] ?? '');
-$modalHanger = (string)($editKey['zawieszka'] ?? '');
-$modalDescription = (string)($editKey['description'] ?? '');
-$modalRfidCode = (string)($editKey['rfid_code'] ?? '');
-$showModal = $editKey !== null;
+$modalId = $editKey ? (int)$editKey['id'] : 0;
+$modalName = $editKey ? (string)$editKey['name'] : '';
+$modalBuildingId = $editKey ? (int)$editKey['building_id'] : 0;
+$modalHanger = $editKey ? (string)($editKey['zawieszka'] ?? '') : '';
+$modalDescription = $editKey ? (string)($editKey['description'] ?? '') : '';
+$modalRfidCode = $editKey ? (string)($editKey['rfid_code'] ?? '') : '';
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
     <div>
         <h1 class="h3 mb-1">Klucze</h1>
-        <div class="text-muted">Lista kluczy i przypisania RFID</div>
+        <div class="text-muted">Zarządzanie kluczami i przypisaniami RFID</div>
     </div>
+
+    <a href="index.php?page=keys&new=1" class="btn btn-primary keys-floating-add" aria-label="Nowy klucz">+</a>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">Lista</div>
+<div class="card shadow-sm">
+    <div class="card-header fw-semibold">Lista kluczy</div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle keys-table">
@@ -346,9 +390,9 @@ $showModal = $editKey !== null;
                         <th>Budynek</th>
                         <th>Zawieszka</th>
                         <th>Opis</th>
-                        <th>Status RFID</th>
                         <th>RFID</th>
-                        <th>Akcje</th>
+                        <th>Status</th>
+                        <th style="width: 180px;">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -359,28 +403,37 @@ $showModal = $editKey !== null;
                     <?php endif; ?>
 
                     <?php foreach ($keys as $key): ?>
+                        <?php
+                        $id = (int)$key['id'];
+                        $name = (string)$key['name'];
+                        $isIssued = (int)($key['is_issued'] ?? 0) === 1;
+                        ?>
                         <tr>
-                            <td class="fw-semibold"><?= e((string)$key['name']) ?></td>
-                            <td><?= e((string)($key['budynek'] ?? '')) ?></td>
+                            <td class="fw-semibold"><?= e($name) ?></td>
+                            <td><?= e((string)$key['building_name']) ?></td>
                             <td><?= e((string)($key['zawieszka'] ?? '')) ?></td>
                             <td><?= e((string)($key['description'] ?? '')) ?></td>
-                            <td>
-                                <?php if ((string)$key['rfid_status'] === 'Przypisany'): ?>
-                                    <span class="badge text-bg-success">Przypisany</span>
-                                <?php else: ?>
-                                    <span class="badge text-bg-secondary">Brak RFID</span>
-                                <?php endif; ?>
-                            </td>
                             <td><?= e((string)($key['rfid_code'] ?? '')) ?></td>
                             <td>
-                                <div class="d-flex flex-wrap gap-1 justify-content-center">
-                                    <a href="index.php?page=keys&amp;edit=<?= (int)$key['id'] ?>" class="btn btn-outline-primary btn-sm">Edytuj</a>
+                                <?php if ($isIssued): ?>
+                                    <span class="badge text-bg-danger">Wypożyczony</span>
+                                <?php else: ?>
+                                    <span class="badge text-bg-success">Dostępny</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <a href="index.php?page=keys&edit=<?= $id ?>" class="btn btn-outline-primary btn-sm">
+                                        Edytuj
+                                    </a>
 
-                                    <form method="post" onsubmit="return confirm('Usunąć klucz?');">
+                                    <form method="post" class="d-inline" onsubmit="return confirm('Usunąć klucz: <?= e($name) ?>?');">
                                         <?= csrf_input() ?>
                                         <input type="hidden" name="action" value="delete_key">
-                                        <input type="hidden" name="id" value="<?= (int)$key['id'] ?>">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Usuń</button>
+                                        <input type="hidden" name="id" value="<?= $id ?>">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            Usuń
+                                        </button>
                                     </form>
                                 </div>
                             </td>
@@ -389,17 +442,6 @@ $showModal = $editKey !== null;
                 </tbody>
             </table>
         </div>
-
-        <hr>
-
-        <button
-            type="button"
-            class="btn btn-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#keyModal"
-        >
-            Dodaj
-        </button>
     </div>
 </div>
 
@@ -415,32 +457,43 @@ $showModal = $editKey !== null;
             <form method="post" autocomplete="off">
                 <?= csrf_input() ?>
                 <input type="hidden" name="action" value="save_key">
-                <input type="hidden" name="id" value="<?= $modalKeyId ?>">
+                <input type="hidden" name="id" value="<?= $modalId ?>">
 
                 <div class="modal-header">
-                    <h5 class="modal-title"><?= e($modalTitle) ?></h5>
+                    <h5 class="modal-title"><?= $modalId > 0 ? 'Edytuj klucz' : 'Nowy klucz' ?></h5>
                     <a href="index.php?page=keys" class="btn-close" aria-label="Zamknij"></a>
                 </div>
 
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nazwa</label>
-                        <input type="text" name="name" class="form-control" required value="<?= e($modalName) ?>">
+                        <input type="text" name="name" class="form-control" value="<?= e($modalName) ?>" maxlength="150" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Budynek</label>
-                        <input type="text" name="building" class="form-control" value="<?= e($modalBuilding) ?>">
+                        <select name="building_id" class="form-select" required>
+                            <option value="">Wybierz budynek</option>
+                            <?php foreach ($buildings as $building): ?>
+                                <?php
+                                $buildingId = (int)$building['id'];
+                                $buildingName = (string)$building['name'];
+                                ?>
+                                <option value="<?= $buildingId ?>" <?= $buildingId === $modalBuildingId ? 'selected' : '' ?>>
+                                    <?= e($buildingName) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Zawieszka</label>
-                        <input type="text" name="hanger" class="form-control" value="<?= e($modalHanger) ?>">
+                        <input type="text" name="hanger" class="form-control" value="<?= e($modalHanger) ?>" maxlength="25">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Opis</label>
-                        <textarea name="description" class="form-control" rows="3"><?= e($modalDescription) ?></textarea>
+                        <textarea name="description" class="form-control" rows="3" maxlength="500"><?= e($modalDescription) ?></textarea>
                     </div>
 
                     <div class="mb-0">
@@ -452,7 +505,7 @@ $showModal = $editKey !== null;
 
                 <div class="modal-footer">
                     <a href="index.php?page=keys" class="btn btn-outline-secondary">Anuluj</a>
-                    <button type="submit" class="btn btn-primary"><?= e($modalSubmit) ?></button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
                 </div>
             </form>
         </div>
