@@ -7,11 +7,6 @@ function keys_null_if_empty(?string $value): ?string
     return $value === '' ? null : $value;
 }
 
-function keys_required_text(?string $value): string
-{
-    return trim((string)$value);
-}
-
 function keys_insert_log(PDO $pdo, int $keyId, ?int $rfidTagId, string $actionType, ?string $details): void
 {
     $stmt = $pdo->prepare("
@@ -166,9 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'save_key') {
             $id = (int)($_POST['id'] ?? 0);
-            $name = keys_required_text($_POST['name'] ?? '');
+            $name = trim((string)($_POST['name'] ?? ''));
             $buildingId = (int)($_POST['building_id'] ?? 0);
-            $hanger = keys_required_text($_POST['hanger'] ?? '');
+            $hanger = keys_null_if_empty($_POST['hanger'] ?? null);
             $description = keys_null_if_empty($_POST['description'] ?? null);
             $rfidCode = keys_null_if_empty($_POST['rfid_code'] ?? null);
 
@@ -249,7 +244,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
 
-            $keyName = keys_get_key_name($pdo, $id);
+            $stmt = $pdo->prepare("SELECT name FROM `keys` WHERE id = :id LIMIT 1 FOR UPDATE");
+            $stmt->execute([':id' => $id]);
+            $keyName = (string)($stmt->fetchColumn() ?: ('ID ' . $id));
 
             $stmt = $pdo->prepare("
                 SELECT id, rfid_tag_id
@@ -318,14 +315,7 @@ if ($editId > 0) {
     ");
     $stmt->execute([':id' => $editId]);
     $editKey = $stmt->fetch() ?: null;
-
-    if (!$editKey) {
-        set_flash('danger', 'Nie znaleziono klucza.');
-        redirect('index.php?page=keys');
-    }
 }
-
-$showModal = isset($_GET['new']) || $editKey !== null;
 
 $buildings = $pdo->query("
     SELECT id, name
@@ -343,9 +333,12 @@ $stmt = $pdo->query("
         k.zawieszka,
         k.description,
         r.rfid_code,
-        CASE WHEN kl.id IS NOT NULL THEN 1 ELSE 0 END AS is_issued,
-        kl.issued_to_name,
-        kl.issued_at
+        CASE WHEN EXISTS (
+            SELECT 1
+            FROM key_loans kl
+            WHERE kl.key_id = k.id
+              AND kl.returned_at IS NULL
+        ) THEN 0 ELSE 1 END AS is_available
     FROM `keys` k
     INNER JOIN buildings b
         ON b.id = k.building_id
@@ -354,83 +347,177 @@ $stmt = $pdo->query("
        AND a.assigned_to IS NULL
     LEFT JOIN rfid_tags r
         ON r.id = a.rfid_tag_id
-    LEFT JOIN key_loans kl
-        ON kl.key_id = k.id
-       AND kl.returned_at IS NULL
     WHERE k.is_active = 1
     ORDER BY b.name, k.name
 ");
 $keys = $stmt->fetchAll();
 
-$modalId = $editKey ? (int)$editKey['id'] : 0;
-$modalName = $editKey ? (string)$editKey['name'] : '';
-$modalBuildingId = $editKey ? (int)$editKey['building_id'] : 0;
-$modalHanger = $editKey ? (string)($editKey['zawieszka'] ?? '') : '';
-$modalDescription = $editKey ? (string)($editKey['description'] ?? '') : '';
-$modalRfidCode = $editKey ? (string)($editKey['rfid_code'] ?? '') : '';
+$modalTitle = $editKey ? 'Edytuj klucz' : 'Dodaj klucz';
+$modalSubmit = $editKey ? 'Zapisz zmiany' : 'Dodaj';
+$modalKeyId = (int)($editKey['id'] ?? 0);
+$modalName = (string)($editKey['name'] ?? '');
+$modalBuildingId = (int)($editKey['building_id'] ?? 0);
+$modalHanger = (string)($editKey['zawieszka'] ?? '');
+$modalDescription = (string)($editKey['description'] ?? '');
+$modalRfidCode = (string)($editKey['rfid_code'] ?? '');
+$showModal = isset($_GET['new']) || $editKey !== null;
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
     <div>
         <h1 class="h3 mb-1">Klucze</h1>
-        <div class="text-muted">Zarządzanie kluczami i przypisaniami RFID</div>
+        <div class="text-muted">Lista kluczy i przypisania RFID</div>
     </div>
-
-    <a href="index.php?page=keys&new=1" class="btn btn-primary keys-floating-add" aria-label="Nowy klucz">+</a>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header fw-semibold">Lista kluczy</div>
+<a
+    href="index.php?page=keys&amp;new=1"
+    class="btn btn-primary keys-floating-add"
+    aria-label="Dodaj klucz"
+    title="Dodaj klucz"
+>+</a>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Lista</div>
+
     <div class="card-body">
+        <div class="keys-toolbar mb-3">
+            <div class="input-group keys-search-group">
+                <span class="input-group-text">Szukaj</span>
+                <input type="text" class="form-control" id="keysSearch" autocomplete="off">
+                <button class="btn btn-outline-secondary" type="button" id="keysClearSearch">Wyczyść</button>
+            </div>
+
+            <div class="keys-filter-controls">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="keysWithoutRfidOnly">
+                    <label class="form-check-label" for="keysWithoutRfidOnly">Pokaż klucze bez RFID</label>
+                </div>
+
+                <div class="btn-group btn-group-sm keys-availability-filter" role="group" aria-label="Status klucza">
+                    <button type="button" class="btn btn-outline-secondary active" data-availability-filter="all" aria-pressed="true">Wszystkie</button>
+                    <button type="button" class="btn btn-outline-secondary" data-availability-filter="available" aria-pressed="false">Dostępne</button>
+                    <button type="button" class="btn btn-outline-secondary" data-availability-filter="issued" aria-pressed="false">Wypożyczone</button>
+                </div>
+
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="keysShowAll">Pokaż wszystko</button>
+            </div>
+        </div>
+
+        <div class="text-muted small mb-2">
+            Widocznych: <strong id="keysVisibleCount"><?= count($keys) ?></strong> / <?= count($keys) ?>
+            <span id="keysBuildingFilterLabel" class="ms-2 d-none"></span>
+        </div>
+
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle keys-table">
+            <table class="table table-sm table-hover align-middle keys-table" id="keysTable">
                 <thead>
                     <tr>
-                        <th>Nazwa</th>
-                        <th>Budynek</th>
-                        <th>Zawieszka</th>
+                        <th>
+                            <button type="button" class="keys-sort-button" data-sort-key="name">
+                                Nazwa <span class="keys-sort-indicator" aria-hidden="true"></span>
+                            </button>
+                        </th>
+
+                        <th>
+                            <button type="button" class="keys-sort-button" data-sort-key="building">
+                                Budynek <span class="keys-sort-indicator" aria-hidden="true"></span>
+                            </button>
+                        </th>
+
+                        <th>
+                            <button type="button" class="keys-sort-button" data-sort-key="hanger">
+                                Zawieszka <span class="keys-sort-indicator" aria-hidden="true"></span>
+                            </button>
+                        </th>
+
                         <th>Opis</th>
-                        <th>RFID</th>
+
+                        <th>
+                            <button type="button" class="keys-sort-button" data-sort-key="rfid">
+                                RFID <span class="keys-sort-indicator" aria-hidden="true"></span>
+                            </button>
+                        </th>
+
                         <th>Status</th>
-                        <th style="width: 180px;">Akcje</th>
+                        <th>Akcje</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     <?php if ($keys === []): ?>
-                        <tr>
+                        <tr class="keys-empty-row">
                             <td colspan="7" class="text-muted">Brak kluczy.</td>
                         </tr>
                     <?php endif; ?>
 
                     <?php foreach ($keys as $key): ?>
                         <?php
-                        $id = (int)$key['id'];
-                        $name = (string)$key['name'];
-                        $isIssued = (int)($key['is_issued'] ?? 0) === 1;
+                        $building = trim((string)($key['building_name'] ?? ''));
+                        $rfidCode = trim((string)($key['rfid_code'] ?? ''));
+                        $hasRfid = $rfidCode !== '';
+                        $isAvailable = (int)($key['is_available'] ?? 0) === 1;
                         ?>
-                        <tr>
-                            <td class="fw-semibold"><?= e($name) ?></td>
-                            <td><?= e((string)$key['building_name']) ?></td>
-                            <td><?= e((string)($key['zawieszka'] ?? '')) ?></td>
-                            <td><?= e((string)($key['description'] ?? '')) ?></td>
-                            <td><?= e((string)($key['rfid_code'] ?? '')) ?></td>
-                            <td>
-                                <?php if ($isIssued): ?>
-                                    <span class="badge text-bg-danger">Wypożyczony</span>
-                                <?php else: ?>
-                                    <span class="badge text-bg-success">Dostępny</span>
+
+                        <tr
+                            class="keys-data-row"
+                            data-name="<?= e((string)$key['name']) ?>"
+                            data-building="<?= e($building) ?>"
+                            data-hanger="<?= e((string)($key['zawieszka'] ?? '')) ?>"
+                            data-rfid="<?= e($rfidCode) ?>"
+                            data-has-rfid="<?= $hasRfid ? '1' : '0' ?>"
+                            data-available="<?= $isAvailable ? '1' : '0' ?>"
+                        >
+                            <td class="fw-semibold keys-searchable">
+                                <?= e((string)$key['name']) ?>
+                            </td>
+
+                            <td class="keys-searchable">
+                                <?php if ($building !== ''): ?>
+                                    <button
+                                        type="button"
+                                        class="btn btn-link btn-sm p-0 align-baseline keys-building-filter"
+                                        data-building="<?= e($building) ?>"
+                                    >
+                                        <?= e($building) ?>
+                                    </button>
                                 <?php endif; ?>
                             </td>
+
+                            <td class="keys-searchable">
+                                <?= e((string)($key['zawieszka'] ?? '')) ?>
+                            </td>
+
+                            <td class="keys-searchable">
+                                <?= e((string)($key['description'] ?? '')) ?>
+                            </td>
+
                             <td>
-                                <div class="d-flex gap-2 justify-content-center">
-                                    <a href="index.php?page=keys&edit=<?= $id ?>" class="btn btn-outline-primary btn-sm">
+                                <?= e($rfidCode) ?>
+                            </td>
+
+                            <td class="keys-searchable">
+                                <?php if ($isAvailable): ?>
+                                    <span class="badge text-bg-success">Dostępny</span>
+                                <?php else: ?>
+                                    <span class="badge text-bg-danger">Wypożyczony</span>
+                                <?php endif; ?>
+                            </td>
+
+                            <td>
+                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                    <a
+                                        href="index.php?page=keys&amp;edit=<?= (int)$key['id'] ?>"
+                                        class="btn btn-outline-primary btn-sm"
+                                    >
                                         Edytuj
                                     </a>
 
-                                    <form method="post" class="d-inline" onsubmit="return confirm('Usunąć klucz: <?= e($name) ?>?');">
+                                    <form method="post" onsubmit="return confirm('Usunąć klucz?');">
                                         <?= csrf_input() ?>
                                         <input type="hidden" name="action" value="delete_key">
-                                        <input type="hidden" name="id" value="<?= $id ?>">
+                                        <input type="hidden" name="id" value="<?= (int)$key['id'] ?>">
+
                                         <button type="submit" class="btn btn-outline-danger btn-sm">
                                             Usuń
                                         </button>
@@ -439,6 +526,14 @@ $modalRfidCode = $editKey ? (string)($editKey['rfid_code'] ?? '') : '';
                             </td>
                         </tr>
                     <?php endforeach; ?>
+
+                    <?php if ($keys !== []): ?>
+                        <tr id="keysNoResults" class="d-none">
+                            <td colspan="7" class="text-muted">
+                                Brak kluczy spełniających wybrane kryteria.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -457,29 +552,42 @@ $modalRfidCode = $editKey ? (string)($editKey['rfid_code'] ?? '') : '';
             <form method="post" autocomplete="off">
                 <?= csrf_input() ?>
                 <input type="hidden" name="action" value="save_key">
-                <input type="hidden" name="id" value="<?= $modalId ?>">
+                <input type="hidden" name="id" value="<?= $modalKeyId ?>">
 
                 <div class="modal-header">
-                    <h5 class="modal-title"><?= $modalId > 0 ? 'Edytuj klucz' : 'Nowy klucz' ?></h5>
+                    <h5 class="modal-title"><?= e($modalTitle) ?></h5>
                     <a href="index.php?page=keys" class="btn-close" aria-label="Zamknij"></a>
                 </div>
 
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nazwa</label>
-                        <input type="text" name="name" class="form-control" value="<?= e($modalName) ?>" maxlength="150" required>
+                        <input
+                            type="text"
+                            name="name"
+                            class="form-control"
+                            required
+                            maxlength="150"
+                            value="<?= e($modalName) ?>"
+                        >
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Budynek</label>
+
                         <select name="building_id" class="form-select" required>
                             <option value="">Wybierz budynek</option>
+
                             <?php foreach ($buildings as $building): ?>
                                 <?php
                                 $buildingId = (int)$building['id'];
                                 $buildingName = (string)$building['name'];
                                 ?>
-                                <option value="<?= $buildingId ?>" <?= $buildingId === $modalBuildingId ? 'selected' : '' ?>>
+
+                                <option
+                                    value="<?= $buildingId ?>"
+                                    <?= $buildingId === $modalBuildingId ? 'selected' : '' ?>
+                                >
                                     <?= e($buildingName) ?>
                                 </option>
                             <?php endforeach; ?>
@@ -488,24 +596,49 @@ $modalRfidCode = $editKey ? (string)($editKey['rfid_code'] ?? '') : '';
 
                     <div class="mb-3">
                         <label class="form-label">Zawieszka</label>
-                        <input type="text" name="hanger" class="form-control" value="<?= e($modalHanger) ?>" maxlength="25">
+                        <input
+                            type="text"
+                            name="hanger"
+                            class="form-control"
+                            maxlength="25"
+                            value="<?= e($modalHanger) ?>"
+                        >
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Opis</label>
-                        <textarea name="description" class="form-control" rows="3" maxlength="500"><?= e($modalDescription) ?></textarea>
+                        <textarea
+                            name="description"
+                            class="form-control"
+                            rows="3"
+                            maxlength="500"
+                        ><?= e($modalDescription) ?></textarea>
                     </div>
 
                     <div class="mb-0">
                         <label class="form-label">RFID</label>
-                        <input type="text" name="rfid_code" class="form-control js-rfid-no-enter" value="<?= e($modalRfidCode) ?>">
-                        <div class="form-text">Wyczyść pole i zapisz, żeby usunąć przypisanie RFID.</div>
+
+                        <input
+                            type="text"
+                            name="rfid_code"
+                            class="form-control js-rfid-no-enter"
+                            value="<?= e($modalRfidCode) ?>"
+                        >
+
+                        <div class="form-text">
+                            Wyczyść pole i zapisz, żeby usunąć przypisanie RFID.
+                        </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <a href="index.php?page=keys" class="btn btn-outline-secondary">Anuluj</a>
-                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                    <a href="index.php?page=keys" class="btn btn-outline-secondary">
+                        Anuluj
+                    </a>
+
+                    <button type="submit" class="btn btn-primary">
+                        <?= e($modalSubmit) ?>
+                    </button>
                 </div>
             </form>
         </div>
