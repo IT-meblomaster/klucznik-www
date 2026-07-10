@@ -9,10 +9,10 @@ function e(?string $value): string
 
 function current_page(): string
 {
-    $page = $_GET['page'] ?? 'home';
+    $page = $_GET['page'] ?? 'key_inventory';
     $page = preg_replace('/[^a-z0-9_-]/i', '', (string) $page);
 
-    return $page !== '' ? $page : 'home';
+    return $page !== '' ? $page : 'key_inventory';
 }
 
 function redirect(string $url): void
