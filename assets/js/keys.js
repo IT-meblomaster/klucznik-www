@@ -11,34 +11,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const modalElement = document.getElementById('keyModal');
+
     if (modalElement && modalElement.dataset.showOnLoad === '1') {
         bootstrap.Modal.getOrCreateInstance(modalElement).show();
     }
 
     const table = document.getElementById('keysTable');
+
     if (!table) {
         return;
     }
 
     const tbody = table.querySelector('tbody');
-    const rows = Array.from(table.querySelectorAll('tbody tr.keys-data-row'));
+    const rows = Array.from(
+        table.querySelectorAll('tbody tr.keys-data-row')
+    );
+
     const searchInput = document.getElementById('keysSearch');
-    const resetButton = document.getElementById('keysResetFilters');
+    const originalResetButton = document.getElementById('keysResetFilters');
     const withoutRfidOnly = document.getElementById('keysWithoutRfidOnly');
     const availableOnly = document.getElementById('keysAvailableOnly');
     const visibleCount = document.getElementById('keysVisibleCount');
-    const buildingFilterLabel = document.getElementById('keysBuildingFilterLabel');
+    const buildingFilterLabel = document.getElementById(
+        'keysBuildingFilterLabel'
+    );
     const noResultsRow = document.getElementById('keysNoResults');
-    const sortButtons = Array.from(table.querySelectorAll('.keys-sort-button'));
+    const sortButtons = Array.from(
+        table.querySelectorAll('.keys-sort-button')
+    );
 
     let selectedBuilding = '';
     let sortKey = '';
     let sortDirection = 'asc';
 
-    const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('pl-PL');
+    const normalize = (value) => {
+        return String(value ?? '')
+            .trim()
+            .toLocaleLowerCase('pl-PL');
+    };
 
     rows.forEach((row, index) => {
         row.dataset.originalIndex = String(index);
+
         row.dataset.searchText = normalize(
             Array.from(row.querySelectorAll('.keys-searchable'))
                 .map((cell) => cell.textContent || '')
@@ -46,10 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     });
 
-    const compareNatural = (left, right) => left.localeCompare(right, 'pl', {
-        numeric: true,
-        sensitivity: 'base',
-    });
+    const compareNatural = (left, right) => {
+        return left.localeCompare(right, 'pl', {
+            numeric: true,
+            sensitivity: 'base',
+        });
+    };
 
     function getSortValue(row, key) {
         return normalize(row.dataset[key] || '');
@@ -57,20 +73,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSortIndicators() {
         sortButtons.forEach((button) => {
-            const indicator = button.querySelector('.keys-sort-indicator');
+            const indicator = button.querySelector(
+                '.keys-sort-indicator'
+            );
+
             const active = button.dataset.sortKey === sortKey;
 
             button.classList.toggle('is-active', active);
+
             button.setAttribute(
                 'aria-sort',
                 active
-                    ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                    ? (
+                        sortDirection === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                    )
                     : 'none'
             );
 
             if (indicator) {
                 indicator.textContent = active
-                    ? (sortDirection === 'asc' ? '▲' : '▼')
+                    ? (
+                        sortDirection === 'asc'
+                            ? '▲'
+                            : '▼'
+                    )
                     : '';
             }
         });
@@ -79,7 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function sortRows() {
         const sortedRows = [...rows].sort((left, right) => {
             if (sortKey === '') {
-                return Number(left.dataset.originalIndex) - Number(right.dataset.originalIndex);
+                return (
+                    Number(left.dataset.originalIndex) -
+                    Number(right.dataset.originalIndex)
+                );
             }
 
             const result = compareNatural(
@@ -87,10 +118,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 getSortValue(right, sortKey)
             );
 
-            return sortDirection === 'asc' ? result : -result;
+            return sortDirection === 'asc'
+                ? result
+                : -result;
         });
 
-        sortedRows.forEach((row) => tbody.appendChild(row));
+        sortedRows.forEach((row) => {
+            tbody.appendChild(row);
+        });
 
         if (noResultsRow) {
             tbody.appendChild(noResultsRow);
@@ -99,8 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyFilters() {
         const needle = normalize(searchInput?.value || '');
-        const filterWithoutRfid = Boolean(withoutRfidOnly?.checked);
-        const filterAvailable = Boolean(availableOnly?.checked);
+        const filterWithoutRfid = Boolean(
+            withoutRfidOnly?.checked
+        );
+        const filterAvailable = Boolean(
+            availableOnly?.checked
+        );
 
         let shown = 0;
 
@@ -111,7 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const matchesBuilding =
                 selectedBuilding === '' ||
-                normalize(row.dataset.building) === normalize(selectedBuilding);
+                normalize(row.dataset.building) ===
+                    normalize(selectedBuilding);
 
             const matchesRfid =
                 !filterWithoutRfid ||
@@ -140,7 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (buildingFilterLabel) {
             if (selectedBuilding !== '') {
-                buildingFilterLabel.textContent = `Budynek: ${selectedBuilding}`;
+                buildingFilterLabel.textContent =
+                    `Budynek: ${selectedBuilding}`;
+
                 buildingFilterLabel.classList.remove('d-none');
             } else {
                 buildingFilterLabel.textContent = '';
@@ -149,22 +191,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (noResultsRow) {
-            noResultsRow.classList.toggle('d-none', shown !== 0);
+            noResultsRow.classList.toggle(
+                'd-none',
+                shown !== 0
+            );
         }
     }
 
-    searchInput?.addEventListener('input', applyFilters);
-    withoutRfidOnly?.addEventListener('change', applyFilters);
-    availableOnly?.addEventListener('change', applyFilters);
+    function clearSearch() {
+        if (searchInput) {
+            searchInput.value = '';
+        }
 
-    table.querySelectorAll('.keys-building-filter').forEach((button) => {
-        button.addEventListener('click', () => {
-            selectedBuilding = button.dataset.building || '';
-            applyFilters();
-        });
-    });
+        applyFilters();
+        searchInput?.focus();
+    }
 
-    resetButton?.addEventListener('click', () => {
+    function showAll() {
         if (searchInput) {
             searchInput.value = '';
         }
@@ -186,16 +229,104 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters();
 
         searchInput?.focus();
-    });
+    }
+
+    function prepareFilterButtons() {
+        if (!originalResetButton) {
+            return;
+        }
+
+        originalResetButton.textContent = 'Wyczyść';
+        originalResetButton.id = 'keysClearSearch';
+
+        originalResetButton.addEventListener(
+            'click',
+            clearSearch
+        );
+
+        const filtersContainer = originalResetButton.closest(
+            '.keys-filters'
+        );
+
+        if (!filtersContainer) {
+            return;
+        }
+
+        const switches = Array.from(
+            filtersContainer.querySelectorAll(
+                '.form-check.form-switch'
+            )
+        );
+
+        const controlsRow = document.createElement('div');
+
+        controlsRow.className =
+            'd-flex flex-wrap align-items-end ' +
+            'justify-content-between gap-3';
+
+        const switchesContainer = document.createElement('div');
+
+        switchesContainer.className =
+            'd-flex flex-column gap-1';
+
+        switches.forEach((switchElement) => {
+            switchesContainer.appendChild(switchElement);
+        });
+
+        const showAllButton = document.createElement('button');
+
+        showAllButton.type = 'button';
+        showAllButton.id = 'keysShowAll';
+        showAllButton.className =
+            'btn btn-outline-secondary';
+        showAllButton.textContent = 'Pokaż wszystko';
+
+        showAllButton.addEventListener(
+            'click',
+            showAll
+        );
+
+        controlsRow.appendChild(switchesContainer);
+        controlsRow.appendChild(showAllButton);
+        filtersContainer.appendChild(controlsRow);
+    }
+
+    searchInput?.addEventListener(
+        'input',
+        applyFilters
+    );
+
+    withoutRfidOnly?.addEventListener(
+        'change',
+        applyFilters
+    );
+
+    availableOnly?.addEventListener(
+        'change',
+        applyFilters
+    );
+
+    table
+        .querySelectorAll('.keys-building-filter')
+        .forEach((button) => {
+            button.addEventListener('click', () => {
+                selectedBuilding =
+                    button.dataset.building || '';
+
+                applyFilters();
+            });
+        });
 
     sortButtons.forEach((button) => {
         button.addEventListener('click', () => {
-            const newSortKey = button.dataset.sortKey || '';
+            const newSortKey =
+                button.dataset.sortKey || '';
 
             if (sortKey === newSortKey) {
-                sortDirection = sortDirection === 'asc'
-                    ? 'desc'
-                    : 'asc';
+                sortDirection =
+                    sortDirection === 'asc'
+                        ? 'desc'
+                        : 'asc';
             } else {
                 sortKey = newSortKey;
                 sortDirection = 'asc';
@@ -206,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    prepareFilterButtons();
     updateSortIndicators();
     applyFilters();
 });
