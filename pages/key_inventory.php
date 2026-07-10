@@ -11,6 +11,7 @@ function key_inventory_fetch_data(PDO $pdo): array
             k.name,
             k.zawieszka,
             k.description,
+            b.id AS building_id,
             b.name AS building,
             r.rfid_code,
             CASE WHEN kl.id IS NOT NULL THEN 1 ELSE 0 END AS is_issued,
@@ -34,12 +35,14 @@ function key_inventory_fetch_data(PDO $pdo): array
     $keys = $stmt->fetchAll();
 
     $groups = [];
+    $buildings = [];
     $totalKeys = 0;
     $issuedKeys = 0;
     $availableKeys = 0;
     $withoutRfid = 0;
 
     foreach ($keys as $key) {
+        $buildingId = (int)($key['building_id'] ?? 0);
         $building = trim((string)($key['building'] ?? ''));
         $building = $building !== '' ? $building : 'Bez budynku';
 
@@ -58,15 +61,26 @@ function key_inventory_fetch_data(PDO $pdo): array
             $withoutRfid++;
         }
 
-        if (!isset($groups[$building])) {
-            $groups[$building] = [];
+        if (!isset($groups[$buildingId])) {
+            $groups[$buildingId] = [
+                'id' => $buildingId,
+                'name' => $building,
+                'keys' => [],
+            ];
         }
 
-        $groups[$building][] = $key;
+        $groups[$buildingId]['keys'][] = $key;
+
+        if ($buildingId > 0) {
+            $buildings[$buildingId] = $building;
+        }
     }
+
+    asort($buildings, SORT_NATURAL | SORT_FLAG_CASE);
 
     return [
         'groups' => $groups,
+        'buildings' => $buildings,
         'totalKeys' => $totalKeys,
         'issuedKeys' => $issuedKeys,
         'availableKeys' => $availableKeys,
@@ -165,8 +179,21 @@ function key_inventory_render_content(array $data): void
         <div class="alert alert-info">Brak aktywnych kluczy.</div>
     <?php endif; ?>
 
-    <?php foreach ($groups as $buildingName => $buildingKeys): ?>
-        <section class="key-inventory-group shadow-sm">
+    <div id="key-inventory-no-results" class="alert alert-info d-none">
+        Brak kluczy spełniających wybrane kryteria.
+    </div>
+
+    <?php foreach ($groups as $group): ?>
+        <?php
+        $buildingId = (int)$group['id'];
+        $buildingName = (string)$group['name'];
+        $buildingKeys = $group['keys'];
+        ?>
+
+        <section
+            class="key-inventory-group shadow-sm"
+            data-building-id="<?= $buildingId ?>"
+        >
             <div class="key-inventory-group-header">
                 <?= e($buildingName) ?>
             </div>
@@ -179,8 +206,10 @@ function key_inventory_render_content(array $data): void
                     $hanger = trim((string)($key['zawieszka'] ?? ''));
                     $issuedToName = trim((string)($key['issued_to_name'] ?? ''));
                     ?>
+
                     <article
                         class="key-inventory-tile <?= $isIssued ? 'is-issued' : '' ?>"
+                        data-status="<?= $isIssued ? 'issued' : 'available' ?>"
                         title="<?= e(key_inventory_tooltip($key)) ?>"
                     >
                         <div class="key-inventory-name">
@@ -222,6 +251,7 @@ if ($isPartialRequest) {
 }
 
 $partialUrl = 'index.php?page=key_inventory&partial=1';
+$buildings = $data['buildings'];
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
@@ -230,11 +260,87 @@ $partialUrl = 'index.php?page=key_inventory&partial=1';
         <div class="text-muted">Inwentaryzacja według budynków</div>
     </div>
 
-    <div class="text-muted key-inventory-refresh-status" id="key-inventory-refresh-state">
+    <div
+        class="text-muted key-inventory-refresh-status"
+        id="key-inventory-refresh-state"
+    >
         Odświeżanie automatyczne
     </div>
 </div>
 
-<div id="key-inventory-content" data-refresh-url="<?= e($partialUrl) ?>">
+<div class="key-inventory-toolbar mb-4">
+    <div class="input-group key-inventory-building-filter">
+        <label
+            class="input-group-text"
+            for="key-inventory-building"
+        >
+            Budynek
+        </label>
+
+        <select
+            id="key-inventory-building"
+            class="form-select"
+        >
+            <option value="">Wszystkie</option>
+
+            <?php foreach ($buildings as $buildingId => $buildingName): ?>
+                <option value="<?= (int)$buildingId ?>">
+                    <?= e((string)$buildingName) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="key-inventory-filter-area">
+        <fieldset class="key-inventory-filter-box">
+            <legend>Wyświetlone klucze</legend>
+
+            <div class="form-check form-switch">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="key-inventory-available"
+                >
+
+                <label
+                    class="form-check-label"
+                    for="key-inventory-available"
+                >
+                    Dostępne
+                </label>
+            </div>
+
+            <div class="form-check form-switch">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="key-inventory-issued"
+                >
+
+                <label
+                    class="form-check-label"
+                    for="key-inventory-issued"
+                >
+                    Wypożyczone
+                </label>
+            </div>
+        </fieldset>
+
+        <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="key-inventory-show-all"
+        >
+            Pokaż wszystko
+        </button>
+    </div>
+</div>
+
+<div
+    id="key-inventory-content"
+    data-refresh-url="<?= e($partialUrl) ?>"
+>
     <?php key_inventory_render_content($data); ?>
 </div>
