@@ -12,8 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const modalElement = document.getElementById('keyModal');
 
-    if (modalElement && modalElement.dataset.showOnLoad === '1') {
-        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    if (
+        modalElement
+        && modalElement.dataset.showOnLoad === '1'
+    ) {
+        bootstrap.Modal
+            .getOrCreateInstance(modalElement)
+            .show();
     }
 
     const table = document.getElementById('keysTable');
@@ -23,19 +28,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const tbody = table.querySelector('tbody');
+
     const rows = Array.from(
         table.querySelectorAll('tbody tr.keys-data-row')
     );
 
-    const searchInput = document.getElementById('keysSearch');
-    const originalResetButton = document.getElementById('keysResetFilters');
-    const withoutRfidOnly = document.getElementById('keysWithoutRfidOnly');
-    const availableOnly = document.getElementById('keysAvailableOnly');
-    const visibleCount = document.getElementById('keysVisibleCount');
-    const buildingFilterLabel = document.getElementById(
-        'keysBuildingFilterLabel'
-    );
-    const noResultsRow = document.getElementById('keysNoResults');
+    const searchInput =
+        document.getElementById('keysSearch');
+
+    const clearSearchButton =
+        document.getElementById('keysClearSearch');
+
+    const showAllButton =
+        document.getElementById('keysShowAll');
+
+    const withoutRfidOnly =
+        document.getElementById('keysWithoutRfidOnly');
+
+    const availableOnly =
+        document.getElementById('keysAvailableOnly');
+
+    const issuedOnly =
+        document.getElementById('keysIssuedOnly');
+
+    const visibleCount =
+        document.getElementById('keysVisibleCount');
+
+    const buildingFilterLabel =
+        document.getElementById('keysBuildingFilterLabel');
+
+    const noResultsRow =
+        document.getElementById('keysNoResults');
+
     const sortButtons = Array.from(
         table.querySelectorAll('.keys-sort-button')
     );
@@ -54,21 +78,29 @@ document.addEventListener('DOMContentLoaded', () => {
         row.dataset.originalIndex = String(index);
 
         row.dataset.searchText = normalize(
-            Array.from(row.querySelectorAll('.keys-searchable'))
+            Array.from(
+                row.querySelectorAll('.keys-searchable')
+            )
                 .map((cell) => cell.textContent || '')
                 .join(' ')
         );
     });
 
     const compareNatural = (left, right) => {
-        return left.localeCompare(right, 'pl', {
-            numeric: true,
-            sensitivity: 'base',
-        });
+        return left.localeCompare(
+            right,
+            'pl',
+            {
+                numeric: true,
+                sensitivity: 'base',
+            }
+        );
     };
 
     function getSortValue(row, key) {
-        return normalize(row.dataset[key] || '');
+        return normalize(
+            row.dataset[key] || ''
+        );
     }
 
     function updateSortIndicators() {
@@ -77,19 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 '.keys-sort-indicator'
             );
 
-            const active = button.dataset.sortKey === sortKey;
+            const active =
+                button.dataset.sortKey === sortKey;
 
-            button.classList.toggle('is-active', active);
-
-            button.setAttribute(
-                'aria-sort',
+            button.classList.toggle(
+                'is-active',
                 active
-                    ? (
-                        sortDirection === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                    )
-                    : 'none'
             );
 
             if (indicator) {
@@ -105,23 +130,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function sortRows() {
-        const sortedRows = [...rows].sort((left, right) => {
-            if (sortKey === '') {
-                return (
-                    Number(left.dataset.originalIndex) -
-                    Number(right.dataset.originalIndex)
+        const sortedRows = [...rows].sort(
+            (left, right) => {
+                if (sortKey === '') {
+                    return (
+                        Number(left.dataset.originalIndex)
+                        - Number(right.dataset.originalIndex)
+                    );
+                }
+
+                const result = compareNatural(
+                    getSortValue(left, sortKey),
+                    getSortValue(right, sortKey)
                 );
+
+                return sortDirection === 'asc'
+                    ? result
+                    : -result;
             }
-
-            const result = compareNatural(
-                getSortValue(left, sortKey),
-                getSortValue(right, sortKey)
-            );
-
-            return sortDirection === 'asc'
-                ? result
-                : -result;
-        });
+        );
 
         sortedRows.forEach((row) => {
             tbody.appendChild(row);
@@ -132,42 +159,73 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function matchesAvailability(row) {
+        const showAvailable =
+            Boolean(availableOnly?.checked);
+
+        const showIssued =
+            Boolean(issuedOnly?.checked);
+
+        if (
+            !showAvailable
+            && !showIssued
+        ) {
+            return true;
+        }
+
+        if (
+            showAvailable
+            && showIssued
+        ) {
+            return true;
+        }
+
+        if (showAvailable) {
+            return row.dataset.available === '1';
+        }
+
+        return row.dataset.available === '0';
+    }
+
     function applyFilters() {
-        const needle = normalize(searchInput?.value || '');
+        const needle = normalize(
+            searchInput?.value || ''
+        );
+
         const filterWithoutRfid = Boolean(
             withoutRfidOnly?.checked
-        );
-        const filterAvailable = Boolean(
-            availableOnly?.checked
         );
 
         let shown = 0;
 
         rows.forEach((row) => {
             const matchesSearch =
-                needle === '' ||
-                (row.dataset.searchText || '').includes(needle);
+                needle === ''
+                || (
+                    row.dataset.searchText || ''
+                ).includes(needle);
 
             const matchesBuilding =
-                selectedBuilding === '' ||
-                normalize(row.dataset.building) ===
-                    normalize(selectedBuilding);
+                selectedBuilding === ''
+                || (
+                    normalize(row.dataset.building)
+                    === normalize(selectedBuilding)
+                );
 
             const matchesRfid =
-                !filterWithoutRfid ||
-                row.dataset.hasRfid === '0';
-
-            const matchesAvailability =
-                !filterAvailable ||
-                row.dataset.available === '1';
+                !filterWithoutRfid
+                || row.dataset.hasRfid === '0';
 
             const visible =
-                matchesSearch &&
-                matchesBuilding &&
-                matchesRfid &&
-                matchesAvailability;
+                matchesSearch
+                && matchesBuilding
+                && matchesRfid
+                && matchesAvailability(row);
 
-            row.classList.toggle('d-none', !visible);
+            row.classList.toggle(
+                'd-none',
+                !visible
+            );
 
             if (visible) {
                 shown++;
@@ -175,7 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (visibleCount) {
-            visibleCount.textContent = String(shown);
+            visibleCount.textContent =
+                String(shown);
         }
 
         if (buildingFilterLabel) {
@@ -183,10 +242,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 buildingFilterLabel.textContent =
                     `Budynek: ${selectedBuilding}`;
 
-                buildingFilterLabel.classList.remove('d-none');
+                buildingFilterLabel.classList.remove(
+                    'd-none'
+                );
             } else {
                 buildingFilterLabel.textContent = '';
-                buildingFilterLabel.classList.add('d-none');
+
+                buildingFilterLabel.classList.add(
+                    'd-none'
+                );
             }
         }
 
@@ -198,102 +262,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function clearSearch() {
-        if (searchInput) {
-            searchInput.value = '';
-        }
-
-        applyFilters();
-        searchInput?.focus();
-    }
-
-    function showAll() {
-        if (searchInput) {
-            searchInput.value = '';
-        }
-
-        if (withoutRfidOnly) {
-            withoutRfidOnly.checked = false;
-        }
-
-        if (availableOnly) {
-            availableOnly.checked = false;
-        }
-
-        selectedBuilding = '';
-        sortKey = '';
-        sortDirection = 'asc';
-
-        sortRows();
-        updateSortIndicators();
-        applyFilters();
-
-        searchInput?.focus();
-    }
-
-    function prepareFilterButtons() {
-        if (!originalResetButton) {
-            return;
-        }
-
-        originalResetButton.textContent = 'Wyczyść';
-        originalResetButton.id = 'keysClearSearch';
-
-        originalResetButton.addEventListener(
-            'click',
-            clearSearch
-        );
-
-        const filtersContainer = originalResetButton.closest(
-            '.keys-filters'
-        );
-
-        if (!filtersContainer) {
-            return;
-        }
-
-        const switches = Array.from(
-            filtersContainer.querySelectorAll(
-                '.form-check.form-switch'
-            )
-        );
-
-        const controlsRow = document.createElement('div');
-
-        controlsRow.className =
-            'd-flex flex-wrap align-items-end ' +
-            'justify-content-between gap-3';
-
-        const switchesContainer = document.createElement('div');
-
-        switchesContainer.className =
-            'd-flex flex-column gap-1';
-
-        switches.forEach((switchElement) => {
-            switchesContainer.appendChild(switchElement);
-        });
-
-        const showAllButton = document.createElement('button');
-
-        showAllButton.type = 'button';
-        showAllButton.id = 'keysShowAll';
-        showAllButton.className =
-            'btn btn-outline-secondary';
-        showAllButton.textContent = 'Pokaż wszystko';
-
-        showAllButton.addEventListener(
-            'click',
-            showAll
-        );
-
-        controlsRow.appendChild(switchesContainer);
-        controlsRow.appendChild(showAllButton);
-        filtersContainer.appendChild(controlsRow);
-    }
-
     searchInput?.addEventListener(
         'input',
         applyFilters
+    );
+
+    clearSearchButton?.addEventListener(
+        'click',
+        () => {
+            if (searchInput) {
+                searchInput.value = '';
+            }
+
+            applyFilters();
+            searchInput?.focus();
+        }
+    );
+
+    showAllButton?.addEventListener(
+        'click',
+        () => {
+            if (searchInput) {
+                searchInput.value = '';
+            }
+
+            if (withoutRfidOnly) {
+                withoutRfidOnly.checked = false;
+            }
+
+            if (availableOnly) {
+                availableOnly.checked = false;
+            }
+
+            if (issuedOnly) {
+                issuedOnly.checked = false;
+            }
+
+            selectedBuilding = '';
+            sortKey = '';
+            sortDirection = 'asc';
+
+            sortRows();
+            updateSortIndicators();
+            applyFilters();
+
+            searchInput?.focus();
+        }
     );
 
     withoutRfidOnly?.addEventListener(
@@ -306,38 +320,48 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters
     );
 
+    issuedOnly?.addEventListener(
+        'change',
+        applyFilters
+    );
+
     table
         .querySelectorAll('.keys-building-filter')
         .forEach((button) => {
-            button.addEventListener('click', () => {
-                selectedBuilding =
-                    button.dataset.building || '';
+            button.addEventListener(
+                'click',
+                () => {
+                    selectedBuilding =
+                        button.dataset.building || '';
 
-                applyFilters();
-            });
+                    applyFilters();
+                }
+            );
         });
 
     sortButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            const newSortKey =
-                button.dataset.sortKey || '';
+        button.addEventListener(
+            'click',
+            () => {
+                const newSortKey =
+                    button.dataset.sortKey || '';
 
-            if (sortKey === newSortKey) {
-                sortDirection =
-                    sortDirection === 'asc'
-                        ? 'desc'
-                        : 'asc';
-            } else {
-                sortKey = newSortKey;
-                sortDirection = 'asc';
+                if (sortKey === newSortKey) {
+                    sortDirection =
+                        sortDirection === 'asc'
+                            ? 'desc'
+                            : 'asc';
+                } else {
+                    sortKey = newSortKey;
+                    sortDirection = 'asc';
+                }
+
+                sortRows();
+                updateSortIndicators();
             }
-
-            sortRows();
-            updateSortIndicators();
-        });
+        );
     });
 
-    prepareFilterButtons();
     updateSortIndicators();
     applyFilters();
 });
