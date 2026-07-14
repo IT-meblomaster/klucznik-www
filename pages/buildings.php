@@ -134,14 +134,18 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
         <h1 class="h3 mb-1">Budynki</h1>
         <div class="text-muted">Zarządzanie budynkami używanymi przez klucze</div>
     </div>
-
-    <a href="index.php?page=buildings&new=1" class="btn btn-primary">
-        Nowy
-    </a>
 </div>
+
+<a
+    href="index.php?page=buildings&amp;new=1"
+    class="btn btn-primary keys-floating-add"
+    aria-label="Dodaj budynek"
+    title="Dodaj budynek"
+>+</a>
 
 <div class="card shadow-sm">
     <div class="card-header fw-semibold">Lista budynków</div>
+
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle buildings-table">
@@ -153,6 +157,7 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
                         <th style="width: 180px;">Akcje</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     <?php if ($buildings === []): ?>
                         <tr>
@@ -166,21 +171,45 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
                         $name = (string)$building['name'];
                         $keysCount = (int)$building['keys_count'];
                         ?>
+
                         <tr>
                             <td><?= $id ?></td>
                             <td class="fw-semibold"><?= e($name) ?></td>
                             <td><?= $keysCount ?></td>
+
                             <td>
                                 <div class="d-flex gap-2 justify-content-center">
-                                    <a href="index.php?page=buildings&edit=<?= $id ?>" class="btn btn-outline-primary btn-sm">
+                                    <a
+                                        href="index.php?page=buildings&amp;edit=<?= $id ?>"
+                                        class="btn btn-outline-primary btn-sm"
+                                    >
                                         Edytuj
                                     </a>
 
-                                    <form method="post" class="d-inline" onsubmit="return confirm('Usunąć budynek: <?= e($name) ?>?');">
+                                    <form
+                                        method="post"
+                                        class="d-inline"
+                                        onsubmit="return confirm('Usunąć budynek: <?= e($name) ?>?');"
+                                    >
                                         <?= csrf_input() ?>
-                                        <input type="hidden" name="action" value="delete_building">
-                                        <input type="hidden" name="id" value="<?= $id ?>">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm" <?= $keysCount > 0 ? 'disabled' : '' ?>>
+
+                                        <input
+                                            type="hidden"
+                                            name="action"
+                                            value="delete_building"
+                                        >
+
+                                        <input
+                                            type="hidden"
+                                            name="id"
+                                            value="<?= $id ?>"
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-outline-danger btn-sm"
+                                            <?= $keysCount > 0 ? 'disabled' : '' ?>
+                                        >
                                             Usuń
                                         </button>
                                     </form>
@@ -209,24 +238,76 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
         <div class="modal-content">
             <form method="post" autocomplete="off">
                 <?= csrf_input() ?>
-                <input type="hidden" name="action" value="save_building">
-                <input type="hidden" name="id" value="<?= $modalId ?>">
+
+                <input
+                    type="hidden"
+                    name="action"
+                    value="save_building"
+                >
+
+                <input
+                    type="hidden"
+                    name="id"
+                    value="<?= $modalId ?>"
+                >
 
                 <div class="modal-header">
-                    <h5 class="modal-title"><?= $modalId > 0 ? 'Edytuj budynek' : 'Nowy budynek' ?></h5>
-                    <a href="index.php?page=buildings" class="btn-close" aria-label="Zamknij"></a>
+                    <h5 class="modal-title">
+                        <?= $modalId > 0 ? 'Edytuj budynek' : 'Nowy budynek' ?>
+                    </h5>
+
+                    <a
+                        href="index.php?page=buildings"
+                        class="btn-close"
+                        aria-label="Zamknij"
+                    ></a>
                 </div>
 
                 <div class="modal-body">
                     <label class="form-label">Nazwa</label>
-                    <input type="text" name="name" class="form-control" value="<?= e($modalName) ?>" maxlength="100" required>
+
+                    <input
+                        type="text"
+                        name="name"
+                        class="form-control"
+                        value="<?= e($modalName) ?>"
+                        maxlength="100"
+                        required
+                    >
                 </div>
 
                 <div class="modal-footer">
-                    <a href="index.php?page=buildings" class="btn btn-outline-secondary">Anuluj</a>
-                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                    <a
+                        href="index.php?page=buildings"
+                        class="btn btn-outline-secondary"
+                    >
+                        Anuluj
+                    </a>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Zapisz
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<?php if ($showModal): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalElement = document.getElementById('buildingModal');
+
+    if (
+        modalElement
+        && typeof bootstrap !== 'undefined'
+        && bootstrap.Modal
+    ) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    }
+});
+</script>
+<?php endif; ?>
