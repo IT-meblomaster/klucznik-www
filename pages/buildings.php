@@ -265,7 +265,13 @@ $modalName = $editBuilding
                             </td>
 
                             <td>
-                                <?= $keysCount ?>
+                                <a
+                                    href="index.php?page=keys"
+                                    class="js-building-keys-link"
+                                    data-building="<?= e($name) ?>"
+                                >
+                                    <?= $keysCount ?>
+                                </a>
                             </td>
 
                             <td>
@@ -408,5 +414,16 @@ document.addEventListener('DOMContentLoaded', () => {
             .getOrCreateInstance(modalElement)
             .show();
     }
+
+    document
+        .querySelectorAll('.js-building-keys-link')
+        .forEach((link) => {
+            link.addEventListener('click', () => {
+                sessionStorage.setItem(
+                    'keysBuildingFilter',
+                    link.dataset.building || ''
+                );
+            });
+        });
 });
 </script>
