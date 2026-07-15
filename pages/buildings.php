@@ -8,7 +8,11 @@ function buildings_normalize_name(?string $value): string
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf()) {
-        set_flash('danger', 'Nieprawidłowy token formularza.');
+        set_flash(
+            'danger',
+            'Nieprawidłowy token formularza.'
+        );
+
         redirect('index.php?page=buildings');
     }
 
@@ -17,10 +21,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'save_building') {
             $id = (int)($_POST['id'] ?? 0);
-            $name = buildings_normalize_name($_POST['name'] ?? '');
+
+            $name = buildings_normalize_name(
+                $_POST['name'] ?? ''
+            );
 
             if ($name === '') {
-                throw new RuntimeException('Podaj nazwę budynku.');
+                throw new RuntimeException(
+                    'Podaj nazwę budynku.'
+                );
             }
 
             if ($id > 0) {
@@ -29,22 +38,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SET name = :name
                     WHERE id = :id
                 ");
+
                 $stmt->execute([
                     ':id' => $id,
                     ':name' => $name,
                 ]);
 
-                set_flash('success', 'Zaktualizowano budynek.');
+                set_flash(
+                    'success',
+                    'Zaktualizowano budynek.'
+                );
             } else {
                 $stmt = $pdo->prepare("
-                    INSERT INTO buildings (name, is_active)
-                    VALUES (:name, 1)
+                    INSERT INTO buildings (
+                        name,
+                        is_active
+                    )
+                    VALUES (
+                        :name,
+                        1
+                    )
                 ");
+
                 $stmt->execute([
                     ':name' => $name,
                 ]);
 
-                set_flash('success', 'Dodano budynek.');
+                set_flash(
+                    'success',
+                    'Dodano budynek.'
+                );
             }
 
             redirect('index.php?page=buildings');
@@ -54,7 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = (int)($_POST['id'] ?? 0);
 
             if ($id <= 0) {
-                throw new RuntimeException('Nieprawidłowy budynek.');
+                throw new RuntimeException(
+                    'Nieprawidłowy budynek.'
+                );
             }
 
             $stmt = $pdo->prepare("
@@ -63,11 +88,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE building_id = :id
                   AND is_active = 1
             ");
-            $stmt->execute([':id' => $id]);
+
+            $stmt->execute([
+                ':id' => $id,
+            ]);
+
             $keysCount = (int)$stmt->fetchColumn();
 
             if ($keysCount > 0) {
-                throw new RuntimeException('Nie można usunąć budynku, do którego są przypisane aktywne klucze.');
+                throw new RuntimeException(
+                    'Nie można usunąć budynku, do którego są przypisane aktywne klucze.'
+                );
             }
 
             $stmt = $pdo->prepare("
@@ -75,13 +106,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SET is_active = 0
                 WHERE id = :id
             ");
-            $stmt->execute([':id' => $id]);
 
-            set_flash('success', 'Usunięto budynek.');
+            $stmt->execute([
+                ':id' => $id,
+            ]);
+
+            set_flash(
+                'success',
+                'Usunięto budynek.'
+            );
+
             redirect('index.php?page=buildings');
         }
     } catch (Throwable $e) {
-        set_flash('danger', $e->getMessage());
+        set_flash(
+            'danger',
+            $e->getMessage()
+        );
+
         redirect('index.php?page=buildings');
     }
 }
@@ -91,22 +133,34 @@ $editBuilding = null;
 
 if ($editId > 0) {
     $stmt = $pdo->prepare("
-        SELECT id, name
+        SELECT
+            id,
+            name
         FROM buildings
         WHERE id = :id
           AND is_active = 1
         LIMIT 1
     ");
-    $stmt->execute([':id' => $editId]);
+
+    $stmt->execute([
+        ':id' => $editId,
+    ]);
+
     $editBuilding = $stmt->fetch() ?: null;
 
     if (!$editBuilding) {
-        set_flash('danger', 'Nie znaleziono budynku.');
+        set_flash(
+            'danger',
+            'Nie znaleziono budynku.'
+        );
+
         redirect('index.php?page=buildings');
     }
 }
 
-$showModal = isset($_GET['new']) || $editBuilding !== null;
+$showModal =
+    isset($_GET['new'])
+    || $editBuilding !== null;
 
 $stmt = $pdo->query("
     SELECT
@@ -120,19 +174,34 @@ $stmt = $pdo->query("
         ON k.building_id = b.id
        AND k.is_active = 1
     WHERE b.is_active = 1
-    GROUP BY b.id, b.name, b.created_at, b.updated_at
+    GROUP BY
+        b.id,
+        b.name,
+        b.created_at,
+        b.updated_at
     ORDER BY b.name
 ");
+
 $buildings = $stmt->fetchAll();
 
-$modalId = $editBuilding ? (int)$editBuilding['id'] : 0;
-$modalName = $editBuilding ? (string)$editBuilding['name'] : '';
+$modalId = $editBuilding
+    ? (int)$editBuilding['id']
+    : 0;
+
+$modalName = $editBuilding
+    ? (string)$editBuilding['name']
+    : '';
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
     <div>
-        <h1 class="h3 mb-1">Budynki</h1>
-        <div class="text-muted">Zarządzanie budynkami używanymi przez klucze</div>
+        <h1 class="h3 mb-1">
+            Budynki
+        </h1>
+
+        <div class="text-muted">
+            Zarządzanie budynkami.
+        </div>
     </div>
 </div>
 
@@ -144,24 +213,38 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
 >+</a>
 
 <div class="card shadow-sm">
-    <div class="card-header fw-semibold">Lista budynków</div>
+    <div class="card-header fw-semibold">
+        Lista budynków
+    </div>
 
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle buildings-table">
                 <thead>
                     <tr>
-                        <th style="width: 90px;">ID</th>
-                        <th>Nazwa</th>
-                        <th style="width: 160px;">Aktywne klucze</th>
-                        <th style="width: 180px;">Akcje</th>
+                        <th>
+                            Nazwa
+                        </th>
+
+                        <th style="width: 160px;">
+                            Aktywne klucze
+                        </th>
+
+                        <th style="width: 180px;">
+                            Akcje
+                        </th>
                     </tr>
                 </thead>
 
                 <tbody>
                     <?php if ($buildings === []): ?>
                         <tr>
-                            <td colspan="4" class="text-muted">Brak budynków.</td>
+                            <td
+                                colspan="3"
+                                class="text-muted"
+                            >
+                                Brak budynków.
+                            </td>
                         </tr>
                     <?php endif; ?>
 
@@ -169,13 +252,21 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
                         <?php
                         $id = (int)$building['id'];
                         $name = (string)$building['name'];
-                        $keysCount = (int)$building['keys_count'];
+
+                        $keysCount = (int)(
+                            $building['keys_count']
+                            ?? 0
+                        );
                         ?>
 
                         <tr>
-                            <td><?= $id ?></td>
-                            <td class="fw-semibold"><?= e($name) ?></td>
-                            <td><?= $keysCount ?></td>
+                            <td class="fw-semibold">
+                                <?= e($name) ?>
+                            </td>
+
+                            <td>
+                                <?= $keysCount ?>
+                            </td>
 
                             <td>
                                 <div class="d-flex gap-2 justify-content-center">
@@ -236,7 +327,10 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
 >
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" autocomplete="off">
+            <form
+                method="post"
+                autocomplete="off"
+            >
                 <?= csrf_input() ?>
 
                 <input
@@ -253,7 +347,10 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
 
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <?= $modalId > 0 ? 'Edytuj budynek' : 'Nowy budynek' ?>
+                        <?= $modalId > 0
+                            ? 'Edytuj budynek'
+                            : 'Nowy budynek'
+                        ?>
                     </h5>
 
                     <a
@@ -264,7 +361,9 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
                 </div>
 
                 <div class="modal-body">
-                    <label class="form-label">Nazwa</label>
+                    <label class="form-label">
+                        Nazwa
+                    </label>
 
                     <input
                         type="text"
@@ -296,18 +395,18 @@ $modalName = $editBuilding ? (string)$editBuilding['name'] : '';
     </div>
 </div>
 
-<?php if ($showModal): ?>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const modalElement = document.getElementById('buildingModal');
+document.addEventListener('DOMContentLoaded', () => {
+    const modalElement =
+        document.getElementById('buildingModal');
 
     if (
         modalElement
-        && typeof bootstrap !== 'undefined'
-        && bootstrap.Modal
+        && modalElement.dataset.showOnLoad === '1'
     ) {
-        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        bootstrap.Modal
+            .getOrCreateInstance(modalElement)
+            .show();
     }
 });
 </script>
-<?php endif; ?>

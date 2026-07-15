@@ -8,14 +8,19 @@ $menuTree = get_visible_menu_tree($pdo);
 function menu_contains_current(array $items, string $currentPage): bool
 {
     foreach ($items as $item) {
-        $pageSlug = (string) ($item['page_slug'] ?? '');
+        $pageSlug = (string)($item['page_slug'] ?? '');
 
         if ($pageSlug === $currentPage) {
             return true;
         }
 
         $children = $item['children'] ?? [];
-        if (is_array($children) && $children !== [] && menu_contains_current($children, $currentPage)) {
+
+        if (
+            is_array($children)
+            && $children !== []
+            && menu_contains_current($children, $currentPage)
+        ) {
             return true;
         }
     }
@@ -23,17 +28,30 @@ function menu_contains_current(array $items, string $currentPage): bool
     return false;
 }
 
-function render_menu_tree(array $items, string $currentPage, int $level = 0): void
-{
+function render_menu_tree(
+    array $items,
+    string $currentPage,
+    int $level = 0
+): void {
     foreach ($items as $item) {
-        $label = (string) ($item['label'] ?? '');
+        $label = (string)($item['label'] ?? '');
         $children = $item['children'] ?? [];
         $hasChildren = is_array($children) && $children !== [];
-        $pageSlug = (string) ($item['page_slug'] ?? '');
+        $pageSlug = (string)($item['page_slug'] ?? '');
         $href = menu_item_href($item);
         $target = menu_item_target($item);
-        $isActive = ($pageSlug !== '' && $currentPage === $pageSlug) || ($hasChildren && menu_contains_current($children, $currentPage));
-        $isSeparator = str_starts_with((string) ($item['url'] ?? ''), 'internal:separator');
+
+        $isActive =
+            ($pageSlug !== '' && $currentPage === $pageSlug)
+            || (
+                $hasChildren
+                && menu_contains_current($children, $currentPage)
+            );
+
+        $isSeparator = str_starts_with(
+            (string)($item['url'] ?? ''),
+            'internal:separator'
+        );
 
         if ($isSeparator && $level > 0) {
             echo '<li><hr class="dropdown-divider"></li>';
@@ -52,8 +70,15 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
                     >
                         <?= e($label) ?>
                     </button>
+
                     <ul class="dropdown-menu">
-                        <?php render_menu_tree($children, $currentPage, 1); ?>
+                        <?php
+                        render_menu_tree(
+                            $children,
+                            $currentPage,
+                            1
+                        );
+                        ?>
                     </ul>
                 </li>
                 <?php
@@ -87,8 +112,15 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
                     <span><?= e($label) ?></span>
                     <span class="submenu-caret">›</span>
                 </button>
+
                 <ul class="dropdown-menu">
-                    <?php render_menu_tree($children, $currentPage, $level + 1); ?>
+                    <?php
+                    render_menu_tree(
+                        $children,
+                        $currentPage,
+                        $level + 1
+                    );
+                    ?>
                 </ul>
             </li>
             <?php
@@ -113,33 +145,91 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
 <html lang="pl">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($config['app']['name'] ?? 'Template') ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/style.css') ?>" rel="stylesheet">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>
+        <?= e($config['app']['name'] ?? 'Template') ?>
+    </title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <link
+        href="<?= e(
+            ($config['app']['base_url'] ?? '')
+            . '/assets/css/style.css'
+        ) ?>"
+        rel="stylesheet"
+    >
+
     <?php if ($currentPage === 'key_inventory'): ?>
-        <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/key-inventory.css') ?>" rel="stylesheet">
+        <link
+            href="<?= e(
+                ($config['app']['base_url'] ?? '')
+                . '/assets/css/key-inventory.css'
+            ) ?>"
+            rel="stylesheet"
+        >
     <?php endif; ?>
-    <?php if ($currentPage === 'keys'): ?>
-        <link href="<?= e(($config['app']['base_url'] ?? '') . '/assets/css/keys.css') ?>" rel="stylesheet">
+
+    <?php if (
+        $currentPage === 'keys'
+        || $currentPage === 'buildings'
+    ): ?>
+        <link
+            href="<?= e(
+                ($config['app']['base_url'] ?? '')
+                . '/assets/css/keys.css'
+            ) ?>"
+            rel="stylesheet"
+        >
     <?php endif; ?>
 </head>
+
 <body>
 <div class="page">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 app-navbar">
         <div class="container-fluid">
             <a class="navbar-brand" href="index.php">
-                <img src="<?= e(($config['app']['base_url'] ?? '') . '/assets/img/logo.png') ?>" alt="Logo" class="app-navbar-logo">
+                <img
+                    src="<?= e(
+                        ($config['app']['base_url'] ?? '')
+                        . '/assets/img/logo.png'
+                    ) ?>"
+                    alt="Logo"
+                    class="app-navbar-logo"
+                >
             </a>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainMenu2" aria-controls="mainMenu2" aria-expanded="false" aria-label="Toggle navigation">
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#mainMenu2"
+                aria-controls="mainMenu2"
+                aria-expanded="false"
+                aria-label="Toggle navigation"
+            >
                 <span class="navbar-toggler-icon"></span>
             </button>
 
-            <div class="collapse navbar-collapse" id="mainMenu2">
+            <div
+                class="collapse navbar-collapse"
+                id="mainMenu2"
+            >
                 <?php if (is_logged_in()): ?>
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <?php render_menu_tree($menuTree, $currentPage); ?>
+                        <?php
+                        render_menu_tree(
+                            $menuTree,
+                            $currentPage
+                        );
+                        ?>
                     </ul>
                 <?php endif; ?>
 
@@ -147,13 +237,32 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
                     <?php if (is_logged_in()): ?>
                         <?php
                         $currentUser = current_user($pdo);
+
                         $currentUserFullName = trim(
-                            trim((string)($currentUser['first_name'] ?? '')) . ' ' . trim((string)($currentUser['last_name'] ?? ''))
+                            trim(
+                                (string)(
+                                    $currentUser['first_name']
+                                    ?? ''
+                                )
+                            )
+                            . ' '
+                            . trim(
+                                (string)(
+                                    $currentUser['last_name']
+                                    ?? ''
+                                )
+                            )
                         );
-                        $currentUserDisplayName = $currentUserFullName !== ''
-                            ? $currentUserFullName
-                            : (string)($currentUser['username'] ?? 'Użytkownik');
+
+                        $currentUserDisplayName =
+                            $currentUserFullName !== ''
+                                ? $currentUserFullName
+                                : (string)(
+                                    $currentUser['username']
+                                    ?? 'Użytkownik'
+                                );
                         ?>
+
                         <li class="nav-item dropdown">
                             <button
                                 class="nav-link dropdown-toggle btn btn-link"
@@ -166,13 +275,23 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
 
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li>
-                                    <a class="dropdown-item <?= $currentPage === 'change_password' ? 'active' : '' ?>" href="index.php?page=change_password">
+                                    <a
+                                        class="dropdown-item <?= $currentPage === 'change_password' ? 'active' : '' ?>"
+                                        href="index.php?page=change_password"
+                                    >
                                         Zmień hasło
                                     </a>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+
                                 <li>
-                                    <a class="dropdown-item" href="index.php?page=logout">
+                                    <hr class="dropdown-divider">
+                                </li>
+
+                                <li>
+                                    <a
+                                        class="dropdown-item"
+                                        href="index.php?page=logout"
+                                    >
                                         Wyloguj
                                     </a>
                                 </li>
@@ -180,7 +299,12 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="index.php?page=login">Zaloguj</a>
+                            <a
+                                class="nav-link"
+                                href="index.php?page=login"
+                            >
+                                Zaloguj
+                            </a>
                         </li>
                     <?php endif; ?>
                 </ul>
@@ -194,8 +318,17 @@ function render_menu_tree(array $items, string $currentPage, int $level = 0): vo
             $type = $flash['type'] ?? 'info';
             $message = $flash['message'] ?? '';
             ?>
-            <div class="alert alert-<?= e($type) ?> alert-dismissible fade show" role="alert">
+
+            <div
+                class="alert alert-<?= e($type) ?> alert-dismissible fade show"
+                role="alert"
+            >
                 <?= e($message) ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                ></button>
             </div>
         <?php endforeach; ?>
