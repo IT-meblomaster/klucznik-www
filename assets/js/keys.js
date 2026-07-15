@@ -64,7 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
         table.querySelectorAll('.keys-sort-button')
     );
 
-    let selectedBuilding = '';
+    const urlParameters =
+        new URLSearchParams(window.location.search);
+
+    let selectedBuilding =
+        (urlParameters.get('building') || '').trim();
+
     let sortKey = '';
     let sortDirection = 'asc';
 
