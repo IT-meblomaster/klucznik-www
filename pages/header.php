@@ -145,6 +145,7 @@ function render_menu_tree(
 <html lang="pl">
 <head>
     <meta charset="utf-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
@@ -189,13 +190,26 @@ function render_menu_tree(
             rel="stylesheet"
         >
     <?php endif; ?>
+
+    <?php if ($currentPage === 'key_logs'): ?>
+        <link
+            href="<?= e(
+                ($config['app']['base_url'] ?? '')
+                . '/assets/css/key-logs.css'
+            ) ?>"
+            rel="stylesheet"
+        >
+    <?php endif; ?>
 </head>
 
 <body>
 <div class="page">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 app-navbar">
         <div class="container-fluid">
-            <a class="navbar-brand" href="index.php">
+            <a
+                class="navbar-brand"
+                href="index.php"
+            >
                 <img
                     src="<?= e(
                         ($config['app']['base_url'] ?? '')
