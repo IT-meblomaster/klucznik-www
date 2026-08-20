@@ -8,10 +8,37 @@
     vertical-align: middle;
 }
 
-.key-logs-table td:nth-child(5) {
+.key-logs-table .key-logs-user {
     white-space: normal;
     word-break: break-word;
     overflow-wrap: anywhere;
+}
+
+.key-logs-date {
+    line-height: 1.2;
+}
+
+.key-logs-date span {
+    display: block;
+}
+
+.key-logs-description {
+    display: -webkit-box;
+    max-width: 520px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.35;
+    text-align: left;
+}
+
+.key-logs-refresh-status {
+    font-size: 0.875rem;
+    white-space: nowrap;
 }
 
 .key-logs-date-range-column {

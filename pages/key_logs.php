@@ -1,108 +1,240 @@
 <?php
 declare(strict_types=1);
 
+$descriptionMaxLength = 200;
+$isPartialRequest = isset($_GET['partial']) && (string)$_GET['partial'] === '1';
+
 $dateFrom = trim((string)($_GET['date_from'] ?? ''));
 $dateTo = trim((string)($_GET['date_to'] ?? ''));
 $userFilter = trim((string)($_GET['user'] ?? ''));
 $keyFilter = trim((string)($_GET['key'] ?? ''));
 $buildingFilter = trim((string)($_GET['building'] ?? ''));
 
-$params = [];
+function key_logs_truncate(string $value, int $maxLength): string
+{
+    $value = trim($value);
 
-$whereIssue = [];
-$whereReturn = [];
+    if ($value === '') {
+        return '';
+    }
 
-if ($dateFrom !== '') {
-    $whereIssue[] = 'kl.issued_at >= :date_from_issue';
-    $whereReturn[] = 'kl.returned_at >= :date_from_return';
-    $params[':date_from_issue'] = $dateFrom . ' 00:00:00';
-    $params[':date_from_return'] = $dateFrom . ' 00:00:00';
+    if (mb_strlen($value, 'UTF-8') <= $maxLength) {
+        return $value;
+    }
+
+    return rtrim(mb_substr($value, 0, $maxLength, 'UTF-8')) . '…';
 }
 
-if ($dateTo !== '') {
-    $whereIssue[] = 'kl.issued_at <= :date_to_issue';
-    $whereReturn[] = 'kl.returned_at <= :date_to_return';
-    $params[':date_to_issue'] = $dateTo . ' 23:59:59';
-    $params[':date_to_return'] = $dateTo . ' 23:59:59';
+function key_logs_fetch_rows(
+    PDO $pdo,
+    string $dateFrom,
+    string $dateTo,
+    string $userFilter,
+    string $keyFilter,
+    string $buildingFilter
+): array {
+    $params = [];
+    $whereIssue = [];
+    $whereReturn = [];
+
+    if ($dateFrom !== '') {
+        $whereIssue[] = 'kl.issued_at >= :date_from_issue';
+        $whereReturn[] = 'kl.returned_at >= :date_from_return';
+        $params[':date_from_issue'] = $dateFrom . ' 00:00:00';
+        $params[':date_from_return'] = $dateFrom . ' 00:00:00';
+    }
+
+    if ($dateTo !== '') {
+        $whereIssue[] = 'kl.issued_at <= :date_to_issue';
+        $whereReturn[] = 'kl.returned_at <= :date_to_return';
+        $params[':date_to_issue'] = $dateTo . ' 23:59:59';
+        $params[':date_to_return'] = $dateTo . ' 23:59:59';
+    }
+
+    if ($userFilter !== '') {
+        $whereIssue[] = 'kl.issued_to_name = :user_issue';
+        $whereReturn[] = 'kl.returned_by_name = :user_return';
+        $params[':user_issue'] = $userFilter;
+        $params[':user_return'] = $userFilter;
+    }
+
+    if ($keyFilter !== '') {
+        $whereIssue[] = 'k.name = :key_issue';
+        $whereReturn[] = 'k.name = :key_return';
+        $params[':key_issue'] = $keyFilter;
+        $params[':key_return'] = $keyFilter;
+    }
+
+    if ($buildingFilter !== '') {
+        $whereIssue[] = 'b.name = :building_issue';
+        $whereReturn[] = 'b.name = :building_return';
+        $params[':building_issue'] = $buildingFilter;
+        $params[':building_return'] = $buildingFilter;
+    }
+
+    $issueWhereSql = $whereIssue !== []
+        ? ' AND ' . implode(' AND ', $whereIssue)
+        : '';
+
+    $returnWhereSql = $whereReturn !== []
+        ? ' AND ' . implode(' AND ', $whereReturn)
+        : '';
+
+    $sql = "
+        SELECT *
+        FROM (
+            SELECT
+                kl.issued_at AS event_time,
+                'Wydanie' AS event_type,
+                kl.issued_to_name AS user_name,
+                k.name AS key_name,
+                b.name AS building,
+                k.description AS key_description
+            FROM key_loans kl
+            INNER JOIN `keys` k
+                ON k.id = kl.key_id
+            INNER JOIN buildings b
+                ON b.id = k.building_id
+            WHERE kl.issued_at IS NOT NULL
+            {$issueWhereSql}
+
+            UNION ALL
+
+            SELECT
+                kl.returned_at AS event_time,
+                'Zwrot' AS event_type,
+                kl.returned_by_name AS user_name,
+                k.name AS key_name,
+                b.name AS building,
+                k.description AS key_description
+            FROM key_loans kl
+            INNER JOIN `keys` k
+                ON k.id = kl.key_id
+            INNER JOIN buildings b
+                ON b.id = k.building_id
+            WHERE kl.returned_at IS NOT NULL
+            {$returnWhereSql}
+        ) report
+        ORDER BY event_time DESC
+        LIMIT 1000
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    return $stmt->fetchAll();
 }
 
-if ($userFilter !== '') {
-    $whereIssue[] = 'kl.issued_to_name = :user_issue';
-    $whereReturn[] = 'kl.returned_by_name = :user_return';
-    $params[':user_issue'] = $userFilter;
-    $params[':user_return'] = $userFilter;
+function key_logs_render_results(array $rows, int $descriptionMaxLength): void
+{
+    ?>
+    <div class="card shadow-sm">
+        <div class="card-header fw-semibold">
+            Wyniki: <?= count($rows) ?>
+        </div>
+
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle key-logs-table">
+                    <thead>
+                        <tr>
+                            <th>Data<br>godzina</th>
+                            <th>Typ</th>
+                            <th>Użytkownik</th>
+                            <th>Klucz</th>
+                            <th>Budynek</th>
+                            <th>Opis klucza</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <?php if ($rows === []): ?>
+                            <tr>
+                                <td colspan="6" class="text-muted">
+                                    Brak wpisów.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <?php foreach ($rows as $row): ?>
+                            <?php
+                            $eventTime = trim((string)($row['event_time'] ?? ''));
+                            $datePart = '';
+                            $timePart = '';
+
+                            if ($eventTime !== '') {
+                                try {
+                                    $eventDateTime = new DateTimeImmutable($eventTime);
+                                    $datePart = $eventDateTime->format('Y-m-d');
+                                    $timePart = $eventDateTime->format('H:i:s');
+                                } catch (Throwable) {
+                                    $parts = preg_split('/\s+/', $eventTime, 2);
+                                    $datePart = (string)($parts[0] ?? '');
+                                    $timePart = (string)($parts[1] ?? '');
+                                }
+                            }
+
+                            $description = key_logs_truncate(
+                                (string)($row['key_description'] ?? ''),
+                                $descriptionMaxLength
+                            );
+                            ?>
+                            <tr>
+                                <td class="key-logs-date">
+                                    <?= e($datePart) ?><br><?= e($timePart) ?>
+                                </td>
+
+                                <td>
+                                    <?php if ((string)$row['event_type'] === 'Wydanie'): ?>
+                                        <span class="badge text-bg-danger">Wydanie</span>
+                                    <?php else: ?>
+                                        <span class="badge text-bg-success">Zwrot</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td class="key-logs-user">
+                                    <?= e((string)($row['user_name'] ?? '')) ?>
+                                </td>
+
+                                <td class="fw-semibold">
+                                    <?= e((string)($row['key_name'] ?? '')) ?>
+                                </td>
+
+                                <td>
+                                    <?= e((string)($row['building'] ?? '')) ?>
+                                </td>
+
+                                <td>
+                                    <div
+                                        class="key-logs-description"
+                                        title="<?= e((string)($row['key_description'] ?? '')) ?>"
+                                    >
+                                        <?= e($description) ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php
 }
 
-if ($keyFilter !== '') {
-    $whereIssue[] = 'k.name = :key_issue';
-    $whereReturn[] = 'k.name = :key_return';
-    $params[':key_issue'] = $keyFilter;
-    $params[':key_return'] = $keyFilter;
+$rows = key_logs_fetch_rows(
+    $pdo,
+    $dateFrom,
+    $dateTo,
+    $userFilter,
+    $keyFilter,
+    $buildingFilter
+);
+
+if ($isPartialRequest) {
+    key_logs_render_results($rows, $descriptionMaxLength);
+    exit;
 }
-
-if ($buildingFilter !== '') {
-    $whereIssue[] = 'b.name = :building_issue';
-    $whereReturn[] = 'b.name = :building_return';
-    $params[':building_issue'] = $buildingFilter;
-    $params[':building_return'] = $buildingFilter;
-}
-
-$issueWhereSql = $whereIssue !== []
-    ? ' AND ' . implode(' AND ', $whereIssue)
-    : '';
-
-$returnWhereSql = $whereReturn !== []
-    ? ' AND ' . implode(' AND ', $whereReturn)
-    : '';
-
-$sql = "
-    SELECT *
-    FROM (
-        SELECT
-            kl.issued_at AS event_time,
-            'Wydanie' AS event_type,
-            k.name AS key_name,
-            b.name AS building,
-            kl.issued_to_name AS user_name,
-            kl.issued_to_card AS user_card,
-            r.rfid_code AS rfid_code
-        FROM key_loans kl
-        INNER JOIN `keys` k
-            ON k.id = kl.key_id
-        INNER JOIN buildings b
-            ON b.id = k.building_id
-        LEFT JOIN rfid_tags r
-            ON r.id = kl.rfid_tag_id
-        WHERE kl.issued_at IS NOT NULL
-        {$issueWhereSql}
-
-        UNION ALL
-
-        SELECT
-            kl.returned_at AS event_time,
-            'Zwrot' AS event_type,
-            k.name AS key_name,
-            b.name AS building,
-            kl.returned_by_name AS user_name,
-            kl.returned_by_card AS user_card,
-            r.rfid_code AS rfid_code
-        FROM key_loans kl
-        INNER JOIN `keys` k
-            ON k.id = kl.key_id
-        INNER JOIN buildings b
-            ON b.id = k.building_id
-        LEFT JOIN rfid_tags r
-            ON r.id = kl.rfid_tag_id
-        WHERE kl.returned_at IS NOT NULL
-        {$returnWhereSql}
-    ) report
-    ORDER BY event_time DESC
-    LIMIT 1000
-";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$rows = $stmt->fetchAll();
 
 $users = $pdo->query("
     SELECT user_name
@@ -135,17 +267,44 @@ $buildings = $pdo->query("
     WHERE is_active = 1
     ORDER BY name
 ")->fetchAll();
+
+$partialQuery = [
+    'page' => 'key_logs',
+    'partial' => '1',
+];
+
+if ($dateFrom !== '') {
+    $partialQuery['date_from'] = $dateFrom;
+}
+if ($dateTo !== '') {
+    $partialQuery['date_to'] = $dateTo;
+}
+if ($userFilter !== '') {
+    $partialQuery['user'] = $userFilter;
+}
+if ($keyFilter !== '') {
+    $partialQuery['key'] = $keyFilter;
+}
+if ($buildingFilter !== '') {
+    $partialQuery['building'] = $buildingFilter;
+}
+
+$partialUrl = 'index.php?' . http_build_query($partialQuery);
 ?>
 
 <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
     <div>
-        <h1 class="h3 mb-1">
-            Logi
-        </h1>
-
+        <h1 class="h3 mb-1">Logi</h1>
         <div class="text-muted">
             Historia wydań i zwrotów kluczy
         </div>
+    </div>
+
+    <div
+        class="text-muted key-logs-refresh-status"
+        id="key-logs-refresh-state"
+    >
+        Odświeżanie automatyczne
     </div>
 </div>
 
@@ -155,21 +314,11 @@ $buildings = $pdo->query("
     </div>
 
     <div class="card-body">
-        <form
-            method="get"
-            class="row g-3 align-items-end"
-        >
-            <input
-                type="hidden"
-                name="page"
-                value="key_logs"
-            >
+        <form method="get" class="row g-3 align-items-end">
+            <input type="hidden" name="page" value="key_logs">
 
             <div class="col-12 col-md-3 key-logs-date-range-column">
-                <label
-                    class="form-label"
-                    for="dateRangeInput"
-                >
+                <label class="form-label" for="dateRangeInput">
                     Zakres dat
                 </label>
 
@@ -255,19 +404,11 @@ $buildings = $pdo->query("
                     Pracownik
                 </label>
 
-                <select
-                    name="user"
-                    class="form-select"
-                >
-                    <option value="">
-                        Wszyscy
-                    </option>
+                <select name="user" class="form-select">
+                    <option value="">Wszyscy</option>
 
                     <?php foreach ($users as $user): ?>
-                        <?php
-                        $value = (string)$user['user_name'];
-                        ?>
-
+                        <?php $value = (string)$user['user_name']; ?>
                         <option
                             value="<?= e($value) ?>"
                             <?= $value === $userFilter ? 'selected' : '' ?>
@@ -283,19 +424,11 @@ $buildings = $pdo->query("
                     Klucz
                 </label>
 
-                <select
-                    name="key"
-                    class="form-select"
-                >
-                    <option value="">
-                        Wszystkie
-                    </option>
+                <select name="key" class="form-select">
+                    <option value="">Wszystkie</option>
 
                     <?php foreach ($keys as $key): ?>
-                        <?php
-                        $value = (string)$key['name'];
-                        ?>
-
+                        <?php $value = (string)$key['name']; ?>
                         <option
                             value="<?= e($value) ?>"
                             <?= $value === $keyFilter ? 'selected' : '' ?>
@@ -311,19 +444,11 @@ $buildings = $pdo->query("
                     Budynek
                 </label>
 
-                <select
-                    name="building"
-                    class="form-select"
-                >
-                    <option value="">
-                        Wszystkie
-                    </option>
+                <select name="building" class="form-select">
+                    <option value="">Wszystkie</option>
 
                     <?php foreach ($buildings as $building): ?>
-                        <?php
-                        $value = (string)$building['name'];
-                        ?>
-
+                        <?php $value = (string)$building['name']; ?>
                         <option
                             value="<?= e($value) ?>"
                             <?= $value === $buildingFilter ? 'selected' : '' ?>
@@ -355,99 +480,9 @@ $buildings = $pdo->query("
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header fw-semibold">
-        Wyniki: <?= count($rows) ?>
-    </div>
-
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle key-logs-table">
-                <thead>
-                    <tr>
-                        <th>
-                            Data i godzina
-                        </th>
-
-                        <th>
-                            Typ
-                        </th>
-
-                        <th>
-                            Klucz
-                        </th>
-
-                        <th>
-                            Budynek
-                        </th>
-
-                        <th>
-                            Użytkownik
-                        </th>
-
-                        <th>
-                            Karta
-                        </th>
-
-                        <th>
-                            RFID
-                        </th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <?php if ($rows === []): ?>
-                        <tr>
-                            <td
-                                colspan="7"
-                                class="text-muted"
-                            >
-                                Brak wpisów.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-
-                    <?php foreach ($rows as $row): ?>
-                        <tr>
-                            <td>
-                                <?= e((string)$row['event_time']) ?>
-                            </td>
-
-                            <td>
-                                <?php if ((string)$row['event_type'] === 'Wydanie'): ?>
-                                    <span class="badge text-bg-danger">
-                                        Wydanie
-                                    </span>
-                                <?php else: ?>
-                                    <span class="badge text-bg-success">
-                                        Zwrot
-                                    </span>
-                                <?php endif; ?>
-                            </td>
-
-                            <td class="fw-semibold">
-                                <?= e((string)$row['key_name']) ?>
-                            </td>
-
-                            <td>
-                                <?= e((string)($row['building'] ?? '')) ?>
-                            </td>
-
-                            <td>
-                                <?= e((string)($row['user_name'] ?? '')) ?>
-                            </td>
-
-                            <td>
-                                <?= e((string)($row['user_card'] ?? '')) ?>
-                            </td>
-
-                            <td>
-                                <?= e((string)($row['rfid_code'] ?? '')) ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div
+    id="key-logs-content"
+    data-refresh-url="<?= e($partialUrl) ?>"
+>
+    <?php key_logs_render_results($rows, $descriptionMaxLength); ?>
 </div>
