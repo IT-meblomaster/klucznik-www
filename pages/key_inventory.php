@@ -88,6 +88,17 @@ function key_inventory_fetch_data(PDO $pdo): array
     ];
 }
 
+function key_inventory_shorten_description(string $description, int $limit = 100): string
+{
+    $description = trim($description);
+
+    if (mb_strlen($description, 'UTF-8') <= $limit) {
+        return $description;
+    }
+
+    return rtrim(mb_substr($description, 0, $limit, 'UTF-8')) . '...';
+}
+
 function key_inventory_tooltip(array $key): string
 {
     $lines = [];
@@ -203,6 +214,7 @@ function key_inventory_render_content(array $data): void
                     <?php
                     $isIssued = (int)($key['is_issued'] ?? 0) === 1;
                     $description = trim((string)($key['description'] ?? ''));
+                    $shortDescription = key_inventory_shorten_description($description);
                     $hanger = trim((string)($key['zawieszka'] ?? ''));
                     $issuedToName = trim((string)($key['issued_to_name'] ?? ''));
                     ?>
@@ -217,7 +229,7 @@ function key_inventory_render_content(array $data): void
                         </div>
 
                         <div class="key-inventory-description">
-                            <?= e($description) ?>
+                            <?= e($shortDescription) ?>
                         </div>
 
                         <div class="key-inventory-hanger">

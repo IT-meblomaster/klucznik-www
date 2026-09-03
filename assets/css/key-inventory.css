@@ -113,7 +113,7 @@
 }
 
 .key-inventory-description {
-    font-size: 14px;
+    font-size: 11px;
     line-height: 1.15;
     overflow-wrap: anywhere;
 }
@@ -137,7 +137,7 @@
 }
 
 .key-inventory-user {
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.15;
     overflow-wrap: anywhere;
 }
