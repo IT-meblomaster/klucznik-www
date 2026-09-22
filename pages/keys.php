@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../inc/key_access.php';
+
 $canEditKeys = is_logged_in() && has_permission($pdo, 'pages.keys.edit');
 
 function keys_null_if_empty(?string $value): ?string
@@ -251,6 +253,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'save_key') {
             $id = (int)($_POST['id'] ?? 0);
+            $restricted = isset($_POST['is_restricted']);
+            $cards = key_access_parse_cards((string)($_POST['authorized_cards'] ?? ''));
             $name = trim((string)($_POST['name'] ?? ''));
             $buildingId = (int)($_POST['building_id'] ?? 0);
             $hanger = keys_null_if_empty(
@@ -379,6 +383,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             }
 
+            key_access_save($pdo, $id, $restricted, $cards);
+            keys_insert_log($pdo, $id, null, 'UPDATE',
+                'Dostęp do klucza: ' . ($restricted ? 'specjalny' : 'ogólnodostępny')
+                . '; liczba kart: ' . count($cards)
+                . '; użytkownik WWW: ' . (string)($_SESSION['user_id'] ?? 'nieznany'));
             $pdo->commit();
 
             redirect('index.php?page=keys');
@@ -500,6 +509,7 @@ if ($canEditKeys && $editId > 0) {
             b.name AS building_name,
             k.zawieszka,
             k.description,
+            k.is_restricted,
             r.rfid_code
         FROM `keys` k
         INNER JOIN buildings b
@@ -542,6 +552,7 @@ $stmt = $pdo->query("
         b.name AS building_name,
         k.zawieszka,
         k.description,
+        k.is_restricted,
         r.rfid_code,
         CASE
             WHEN EXISTS (
@@ -583,6 +594,13 @@ $modalBuildingId = (int)($editKey['building_id'] ?? 0);
 $modalHanger = (string)($editKey['zawieszka'] ?? '');
 $modalDescription = (string)($editKey['description'] ?? '');
 $modalRfidCode = (string)($editKey['rfid_code'] ?? '');
+$modalRestricted = (int)($editKey['is_restricted'] ?? 0) === 1;
+$modalCards = '';
+if ($canEditKeys && $modalKeyId > 0) {
+    $stmt = $pdo->prepare('SELECT card_number FROM key_authorized_cards WHERE key_id = ? ORDER BY card_number');
+    $stmt->execute([$modalKeyId]);
+    $modalCards = implode("\n", $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
 
 $showModal =
     $canEditKeys
@@ -836,6 +854,9 @@ $showModal =
                         >
                             <td class="fw-semibold keys-searchable">
                                 <?= e((string)$key['name']) ?>
+                                <?php if ((int)$key['is_restricted'] === 1): ?>
+                                    <span class="badge text-bg-warning">Specjalny</span>
+                                <?php endif; ?>
                             </td>
 
                             <td class="keys-searchable">
@@ -1045,6 +1066,25 @@ $showModal =
                             rows="3"
                             maxlength="500"
                         ><?= e($modalDescription) ?></textarea>
+                    </div>
+
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               name="is_restricted" id="keyRestricted" value="1"
+                               <?= $modalRestricted ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="keyRestricted">Klucz specjalny — ograniczony dostęp</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="keyAuthorizedCards">Numery kart uprawnionych do pobrania</label>
+                        <textarea class="form-control" name="authorized_cards" id="keyAuthorizedCards"
+                                  rows="5" maxlength="100000" spellcheck="false"
+                                  aria-describedby="keyCardsHelp"><?= e($modalCards) ?></textarea>
+                        <div class="form-text" id="keyCardsHelp">
+                            Jeden numer w wierszu; można też rozdzielać je przecinkami lub średnikami.
+                            Dla klucza specjalnego pusta lista oznacza brak zgody dla wszystkich.
+                            Gdy przełącznik jest wyłączony, klucz jest ogólnodostępny.
+                            Zera na początku numeru są pomijane.
+                        </div>
                     </div>
 
                     <div class="mb-0">

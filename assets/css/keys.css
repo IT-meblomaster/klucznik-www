@@ -194,3 +194,23 @@ html {
         height: 1.3rem;
     }
 }
+
+.keys-table {
+    table-layout: auto;
+    width: 100%;
+}
+
+.keys-table thead th {
+    white-space: nowrap;
+}
+
+/* Opis może się zwężać i zawijać */
+.keys-table th:nth-child(4),
+.keys-table td:nth-child(4) {
+    width: 35%;
+}
+
+.keys-table td:nth-child(4) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

@@ -2,7 +2,7 @@
 
 <footer class="footer">
     <div class="container-fluid">
-        &copy; <?= date('Y') ?> <?= e($config['app']['name'] ?? 'Klucznik') ?>
+        &copy; <?= date('Y') ?> <?= e($config['app']['name'] ?? 'Klucznik') ?> <span class="text-muted">v1.2.0</span>
     </div>
 </footer>
 </div>

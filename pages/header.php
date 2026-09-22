@@ -168,7 +168,7 @@ function render_menu_tree(
         rel="stylesheet"
     >
 
-    <?php if ($currentPage === 'key_inventory'): ?>
+    <?php if ($currentPage === 'key_inventory' || $currentPage === 'dashboard'): ?>
         <link
             href="<?= e(
                 ($config['app']['base_url'] ?? '')
